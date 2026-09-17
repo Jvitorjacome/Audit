@@ -98,15 +98,24 @@ function statusTone(value) {
   if (value === "Não se aplica") return "na";
   return "unv";
 }
-function cellSummary(id, monthKey) {
+// Um campo tem 5 indicadores por mês; para a tabela (visão densa) eles viram
+// UM selo por célula, priorizando o pior caso, em vez de 5 pontos coloridos.
+function cellAggregateTone(id, monthKey) {
   const cell = getCell(id, monthKey);
-  let conforme = 0, div = 0;
+  let naoConforme = 0, naoVerificado = 0;
   for (const f of STATUS_FIELDS) {
     const v = cell[f.key] || "Não verificado";
-    if (v === "Conforme") conforme++;
-    else if (v === "Não Conforme") div++;
+    if (v === "Não Conforme") naoConforme++;
+    else if (v === "Não verificado") naoVerificado++;
   }
-  return { conforme, div };
+  if (naoConforme > 0) return { tone: "div", label: "Não conforme" };
+  if (naoVerificado > 0) return { tone: "unv", label: "Pendente" };
+  return { tone: "ok", label: "Conforme" };
+}
+
+function cellDetailTitle(id, monthKey) {
+  const cell = getCell(id, monthKey);
+  return STATUS_FIELDS.map((f) => `${f.label}: ${cell[f.key] || "Não verificado"}`).join(" · ");
 }
 
 function countLeaves(node, kind) {
@@ -120,15 +129,16 @@ function countLeaves(node, kind) {
 // Everything above it (centro de custo, propriedade, estado, seção) is a grouping,
 // so instead of its own status it shows a rolled-up bar over its descendant campos.
 function aggregateAudit(node, kind, months) {
-  let conforme = 0, naoConforme = 0, total = 0;
+  let conforme = 0, naoConforme = 0, resolved = 0, total = 0;
   function visitCampo(campo) {
     for (const m of months) {
       const cell = getCell(campo.id, m.key);
       for (const f of STATUS_FIELDS) {
         total++;
         const v = cell[f.key] || "Não verificado";
-        if (v === "Conforme") conforme++;
-        else if (v === "Não Conforme") naoConforme++;
+        if (v === "Conforme") { conforme++; resolved++; }
+        else if (v === "Não Conforme") { naoConforme++; resolved++; }
+        else if (v === "Não se aplica") { resolved++; }
       }
     }
   }
@@ -137,7 +147,7 @@ function aggregateAudit(node, kind, months) {
     for (const child of childrenOf(n, k)) walk(child, childKind(k));
   }
   walk(node, kind);
-  return { conforme, naoConforme, total };
+  return { conforme, naoConforme, resolved, total };
 }
 function countDescendantNodes(node, kind) {
   const kids = childrenOf(node, kind);
@@ -183,20 +193,13 @@ function monthCellsFragment(id, months) {
   for (const m of months) {
     const td = document.createElement("td");
     td.className = "cell-month";
-    const { conforme, div } = cellSummary(id, m.key);
-    const dots = document.createElement("div");
-    dots.className = "dots";
-    const cell = getCell(id, m.key);
-    for (const f of STATUS_FIELDS) {
-      const val = cell[f.key] || "Não verificado";
-      const dot = document.createElement("span");
-      dot.className = `dot dot-${statusTone(val)}`;
-      dot.title = `${f.label}: ${val}`;
-      dots.appendChild(dot);
-    }
-    td.appendChild(dots);
-    if (div > 0) td.classList.add("cell-has-div");
-    else if (conforme === STATUS_FIELDS.length) td.classList.add("cell-all-ok");
+    const { tone, label } = cellAggregateTone(id, m.key);
+    const badge = document.createElement("span");
+    badge.className = `status-badge status-badge-${tone}`;
+    badge.textContent = label;
+    td.appendChild(badge);
+    td.title = cellDetailTitle(id, m.key);
+    if (tone === "div") td.classList.add("cell-tone-div");
     frag.appendChild(td);
   }
   return frag;
@@ -206,28 +209,29 @@ function auditBarCell(node, kind, months) {
   const td = document.createElement("td");
   td.className = "cell-auditbar";
   td.colSpan = Math.max(months.length, 1);
-  const { conforme, naoConforme, total } = aggregateAudit(node, kind, months);
-  const pctOk = total ? (conforme / total) * 100 : 0;
-  const pctDiv = total ? (naoConforme / total) * 100 : 0;
+  const { conforme, naoConforme, resolved, total } = aggregateAudit(node, kind, months);
+  const pct = total ? (resolved / total) * 100 : 0;
 
   const bar = document.createElement("div");
   bar.className = "auditbar";
-  const segOk = document.createElement("span");
-  segOk.className = "auditbar-seg auditbar-ok";
-  segOk.style.width = `${pctOk}%`;
-  const segDiv = document.createElement("span");
-  segDiv.className = "auditbar-seg auditbar-div";
-  segDiv.style.width = `${pctDiv}%`;
-  bar.appendChild(segOk);
-  bar.appendChild(segDiv);
+  const fill = document.createElement("span");
+  fill.className = "auditbar-fill";
+  fill.style.width = `${pct}%`;
+  bar.appendChild(fill);
 
   const label = document.createElement("span");
   label.className = "auditbar-label";
-  label.textContent = total ? `${Math.round(pctOk)}% conforme · ${naoConforme} não conforme` : "sem campos";
+  label.textContent = total ? `${Math.round(pct)}% verificado` : "sem campos";
+  if (naoConforme > 0) {
+    const alert = document.createElement("span");
+    alert.className = "auditbar-alert";
+    alert.textContent = ` · ${naoConforme} não conforme`;
+    label.appendChild(alert);
+  }
 
   td.appendChild(bar);
   td.appendChild(label);
-  td.title = `${conforme} conforme, ${naoConforme} não conforme, de ${total} avaliações (campos × meses × indicadores) nesta ramificação`;
+  td.title = `${conforme} conforme, ${naoConforme} não conforme, ${resolved} de ${total} avaliações verificadas (campos × meses × indicadores) nesta ramificação`;
   return td;
 }
 

@@ -1,5 +1,16 @@
 # DRE Independente — protótipo
 
+## Identidade visual
+
+Redesenhado para soar institucional em vez de "produto colorido": uma única cor de marca
+(`--brand: #1479d6`) usada com moderação (links, barra de progresso, estado ativo dos filtros),
+tipografia Inter, e hierarquia por peso de fonte + indentação + um trilho monocromático à
+esquerda (mesma cor, opacidade decrescente por nível) em vez de 4 fundos coloridos diferentes.
+Status virou selo de texto (`Conforme`/`Não conforme`/`Pendente`) em vez de bolinhas — vermelho
+só aparece quando há de fato uma divergência a sinalizar. Detalhes e a análise que embasou essas
+escolhas estão na conversa que gerou este protótipo, não repetidos aqui.
+
+
 Aplicativo estático (HTML/CSS/JS puro, sem build) que demonstra as mudanças avaliadas para a aba "DRE" fora da planilha original: menus suspensos de status, filtro de meses, e uma árvore de auditoria dinâmica organizada por **Estado → Propriedade → Centro de custo → Campo**.
 
 ## Rodando localmente

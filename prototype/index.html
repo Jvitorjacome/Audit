@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DRE Independente</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -24,10 +24,10 @@
   </div>
 
   <div class="legend">
-    <span class="legend-item"><span class="kind-badge kind-badge-channel">Estado</span></span>
-    <span class="legend-item"><span class="kind-badge kind-badge-property">Propriedade</span></span>
-    <span class="legend-item"><span class="kind-badge kind-badge-centro">Centro de custo</span></span>
-    <span class="legend-item"><span class="legend-dot"></span> Campo auditado</span>
+    <span class="legend-item"><span class="status-badge status-badge-ok">Conforme</span></span>
+    <span class="legend-item"><span class="status-badge status-badge-div">Não conforme</span></span>
+    <span class="legend-item"><span class="status-badge status-badge-unv">Pendente</span></span>
+    <span class="legend-item"><span class="legend-dot"></span> Barra = % verificado (Estado, Propriedade, Centro de custo)</span>
   </div>
 
   <div class="toolbar">
@@ -44,9 +44,10 @@
   <div class="table-scroll" id="treeWrap"></div>
 
   <p class="footer-note">
-    Só o <strong>campo auditado</strong> tem os 5 status — clique nele para abrir o painel. Estado, propriedade e
-    centro de custo mostram, no lugar disso, uma barra com o quanto dos campos abaixo deles já está
-    conforme/não conforme. Use ▾/▸ para recolher/expandir, <strong>+</strong> em qualquer linha para adicionar um
+    Só o <strong>campo auditado</strong> tem os 5 status — clique nele para abrir o painel (passe o mouse sobre o
+    selo da célula pra ver o detalhe dos 5 indicadores). Estado, propriedade e centro de custo mostram, no lugar
+    disso, uma barra com o quanto dos campos abaixo deles já foi verificado, com aviso em vermelho só quando há
+    algum não conforme. Use ▾/▸ para recolher/expandir, <strong>+</strong> em qualquer linha para adicionar um
     item novo dentro dela (estado numa seção, propriedade num estado, centro de custo numa propriedade, ou campo
     num centro de custo), e <strong>×</strong> para remover.
   </p>
