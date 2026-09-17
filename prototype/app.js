@@ -1,31 +1,70 @@
-const STORAGE_KEY = "dre-prototype-state-v2";
+const STORAGE_KEY = "dre-prototype-state-v3";
+
+// ---------- seed cells: unify tree nodes + flat items into one lookup ----------
+
+const ALL_SEED_CELLS = { ...SEED_CELLS };
+
+function walkTree(nodes, kind, visit) {
+  for (const node of nodes) {
+    visit(node, kind);
+    if (kind === "section") walkTree(node.channels, "channel", visit);
+    else if (kind === "channel") walkTree(node.properties, "property", visit);
+    else if (kind === "property") walkTree(node.centros, "centro", visit);
+    else if (kind === "centro") walkTree(node.campos, "campo", visit);
+  }
+}
+
+walkTree(TREE_SECTIONS, "section", (node) => {
+  if (node.cells) {
+    for (const mk in node.cells) {
+      ALL_SEED_CELLS[`${node.id}::${mk}`] = node.cells[mk];
+    }
+  }
+});
+
+function childrenOf(node, kind) {
+  if (kind === "section") return node.channels;
+  if (kind === "channel") return node.properties;
+  if (kind === "property") return node.centros;
+  if (kind === "centro") return node.campos;
+  return null;
+}
+function childKind(kind) {
+  return { section: "channel", channel: "property", property: "centro", centro: "campo" }[kind] || null;
+}
+
+// ---------- state ----------
 
 function cloneAccounts() {
   return SEED_ACCOUNTS.map((a) => ({ ...a }));
 }
+function cloneTree() {
+  return JSON.parse(JSON.stringify(TREE_SECTIONS));
+}
 
 function loadState() {
+  const fallback = {
+    tab: "tree",
+    tree: cloneTree(),
+    accounts: cloneAccounts(),
+    cells: {},
+    visibleMonths: MONTHS.filter((m) => m.inOriginal).map((m) => m.key),
+    collapsed: {},
+  };
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return {
-        accounts: cloneAccounts(),
-        cells: {},
-        visibleMonths: MONTHS.filter((m) => m.inOriginal).map((m) => m.key),
-      };
-    }
+    if (!raw) return fallback;
     const parsed = JSON.parse(raw);
     return {
-      accounts: parsed.accounts || cloneAccounts(),
+      tab: parsed.tab || fallback.tab,
+      tree: parsed.tree || fallback.tree,
+      accounts: parsed.accounts || fallback.accounts,
       cells: parsed.cells || {},
-      visibleMonths: parsed.visibleMonths || MONTHS.filter((m) => m.inOriginal).map((m) => m.key),
+      visibleMonths: parsed.visibleMonths || fallback.visibleMonths,
+      collapsed: parsed.collapsed || {},
     };
   } catch (e) {
-    return {
-      accounts: cloneAccounts(),
-      cells: {},
-      visibleMonths: MONTHS.filter((m) => m.inOriginal).map((m) => m.key),
-    };
+    return fallback;
   }
 }
 
@@ -39,54 +78,62 @@ function saveState() {
 
 let state = loadState();
 
-function cellKey(accountId, monthKey) {
-  return `${accountId}::${monthKey}`;
+function cellKey(id, monthKey) {
+  return `${id}::${monthKey}`;
 }
-
-function getCell(accountId, monthKey) {
-  const key = cellKey(accountId, monthKey);
-  const seed = SEED_CELLS[key] || {};
-  const override = state.cells[key] || {};
-  return { ...seed, ...override };
+function getCell(id, monthKey) {
+  const key = cellKey(id, monthKey);
+  return { ...(ALL_SEED_CELLS[key] || {}), ...(state.cells[key] || {}) };
 }
-
-function setCellField(accountId, monthKey, field, value) {
-  const key = cellKey(accountId, monthKey);
-  const current = getCell(accountId, monthKey);
-  state.cells[key] = { ...current, [field]: value };
+function setCellField(id, monthKey, field, value) {
+  const key = cellKey(id, monthKey);
+  state.cells[key] = { ...getCell(id, monthKey), [field]: value };
   saveState();
 }
-
 function statusTone(value) {
   if (value === "Conforme") return "ok";
   if (value === "Não Conforme") return "div";
   if (value === "Não se aplica") return "na";
   return "unv";
 }
-
-function cellSummary(accountId, monthKey) {
-  const cell = getCell(accountId, monthKey);
-  let conforme = 0, div = 0, other = 0;
+function cellSummary(id, monthKey) {
+  const cell = getCell(id, monthKey);
+  let conforme = 0, div = 0;
   for (const f of STATUS_FIELDS) {
     const v = cell[f.key] || "Não verificado";
     if (v === "Conforme") conforme++;
     else if (v === "Não Conforme") div++;
-    else other++;
   }
-  return { conforme, div, other };
+  return { conforme, div };
 }
 
 function items() {
   return state.accounts.filter((a) => a.type === "item");
 }
 
-// ---------- rendering ----------
+function countLeaves(node, kind) {
+  if (kind === "centro") return node.campos.length;
+  const kids = childrenOf(node, kind);
+  const nextKind = childKind(kind);
+  return kids.reduce((sum, k) => sum + countLeaves(k, nextKind), 0);
+}
+
+// ---------- shared DOM refs ----------
 
 const monthFilterEl = document.getElementById("monthFilter");
-const tableWrap = document.getElementById("tableWrap");
 const summaryEl = document.getElementById("summary");
 const drawerEl = document.getElementById("drawer");
 const drawerBackdrop = document.getElementById("drawerBackdrop");
+const treeWrap = document.getElementById("treeWrap");
+const flatWrap = document.getElementById("flatWrap");
+const tabTreeBtn = document.getElementById("tabTree");
+const tabFlatBtn = document.getElementById("tabFlat");
+const addFormFlat = document.getElementById("addForm");
+const addInputFlat = document.getElementById("addInput");
+
+function visibleMonthList() {
+  return MONTHS.filter((m) => state.visibleMonths.includes(m.key));
+}
 
 function renderMonthFilter() {
   monthFilterEl.innerHTML = "";
@@ -96,17 +143,11 @@ function renderMonthFilter() {
     chip.type = "button";
     chip.className = "chip" + (active ? " chip-active" : "");
     chip.setAttribute("aria-pressed", String(active));
-    chip.innerHTML =
-      `<span>${m.label}</span>` +
-      (!m.inOriginal ? '<span class="chip-badge">novo</span>' : "");
+    chip.innerHTML = `<span>${m.label}</span>` + (!m.inOriginal ? '<span class="chip-badge">novo</span>' : "");
     chip.addEventListener("click", () => {
-      if (active) {
-        state.visibleMonths = state.visibleMonths.filter((k) => k !== m.key);
-      } else {
-        state.visibleMonths = [...state.visibleMonths, m.key].sort(
-          (a, b) => MONTHS.findIndex((mm) => mm.key === a) - MONTHS.findIndex((mm) => mm.key === b)
-        );
-      }
+      state.visibleMonths = active
+        ? state.visibleMonths.filter((k) => k !== m.key)
+        : [...state.visibleMonths, m.key].sort((a, b) => MONTHS.findIndex((mm) => mm.key === a) - MONTHS.findIndex((mm) => mm.key === b));
       saveState();
       render();
     });
@@ -114,11 +155,171 @@ function renderMonthFilter() {
   }
 }
 
-function visibleMonthList() {
-  return MONTHS.filter((m) => state.visibleMonths.includes(m.key));
+function monthCellsFragment(id, months) {
+  const frag = document.createDocumentFragment();
+  for (const m of months) {
+    const td = document.createElement("td");
+    td.className = "cell-month";
+    const { conforme, div } = cellSummary(id, m.key);
+    const dots = document.createElement("div");
+    dots.className = "dots";
+    const cell = getCell(id, m.key);
+    for (const f of STATUS_FIELDS) {
+      const val = cell[f.key] || "Não verificado";
+      const dot = document.createElement("span");
+      dot.className = `dot dot-${statusTone(val)}`;
+      dot.title = `${f.label}: ${val}`;
+      dots.appendChild(dot);
+    }
+    td.appendChild(dots);
+    if (div > 0) td.classList.add("cell-has-div");
+    else if (conforme === STATUS_FIELDS.length) td.classList.add("cell-all-ok");
+    frag.appendChild(td);
+  }
+  return frag;
 }
 
-function renderTable() {
+// ---------- tree tab ----------
+
+const KIND_LABEL = { section: "Seção", channel: "Canal", property: "Propriedade", centro: "Centro de custo", campo: "Campo auditado" };
+
+function renderTreeTable() {
+  const months = visibleMonthList();
+  const table = document.createElement("table");
+  table.className = "dre-table";
+
+  const thead = document.createElement("thead");
+  const headRow = document.createElement("tr");
+  const th0 = document.createElement("th");
+  th0.className = "col-account";
+  th0.textContent = "Propriedade / Centro de custo / Campo";
+  headRow.appendChild(th0);
+  for (const m of months) {
+    const th = document.createElement("th");
+    th.textContent = m.label;
+    if (!m.inOriginal) th.classList.add("th-new");
+    headRow.appendChild(th);
+  }
+  const thActions = document.createElement("th");
+  thActions.className = "col-actions";
+  headRow.appendChild(thActions);
+  thead.appendChild(headRow);
+  table.appendChild(thead);
+
+  const tbody = document.createElement("tbody");
+
+  function renderNode(node, kind, depth, parentArrayForDelete) {
+    const kids = childrenOf(node, kind);
+    const nextKind = childKind(kind);
+    const hasKids = Array.isArray(kids);
+    const isLeaf = kind === "campo";
+    const collapsed = !!state.collapsed[node.id];
+
+    const tr = document.createElement("tr");
+    tr.className = `row-tree row-depth-${Math.min(depth, 5)} row-kind-${kind}`;
+    const tdName = document.createElement("td");
+    tdName.className = "col-account";
+    tdName.style.paddingLeft = `${10 + depth * 18}px`;
+
+    if (hasKids) {
+      const toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "toggle";
+      toggle.textContent = collapsed ? "▸" : "▾";
+      toggle.title = collapsed ? "Expandir" : "Recolher";
+      toggle.addEventListener("click", (e) => {
+        e.stopPropagation();
+        state.collapsed[node.id] = !collapsed;
+        saveState();
+        renderTreeTable();
+      });
+      tdName.appendChild(toggle);
+    } else {
+      const spacer = document.createElement("span");
+      spacer.className = "toggle-spacer";
+      tdName.appendChild(spacer);
+    }
+
+    const nameSpan = document.createElement("span");
+    nameSpan.textContent = node.name || "(sem nome)";
+    nameSpan.title = `${KIND_LABEL[kind]} · linha ${node.row} na planilha original`;
+    tdName.appendChild(nameSpan);
+
+    if (hasKids) {
+      const count = document.createElement("span");
+      count.className = "node-count";
+      count.textContent = ` (${countLeaves(node, kind)})`;
+      tdName.appendChild(count);
+    }
+    tr.appendChild(tdName);
+
+    // every row (leaf or not) carries its own real audit cells from the sheet, so all are clickable
+    tr.appendChild(monthCellsFragment(node.id, months));
+    tr.addEventListener("click", (e) => {
+      if (e.target.closest(".toggle") || e.target.closest(".row-delete") || e.target.closest(".row-add")) return;
+      openMonthPicker(node, kind);
+    });
+
+    const tdActions = document.createElement("td");
+    tdActions.className = "col-actions";
+    if (kind === "centro") {
+      const addBtn = document.createElement("button");
+      addBtn.type = "button";
+      addBtn.className = "row-add";
+      addBtn.title = "Adicionar campo auditado neste centro de custo";
+      addBtn.textContent = "+";
+      addBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const name = prompt("Nome do novo campo auditado:");
+        if (!name || !name.trim()) return;
+        node.campos.push({ id: `custom-${Date.now()}`, name: name.trim(), row: null, cells: {} });
+        state.collapsed[node.id] = false;
+        saveState();
+        renderTreeTable();
+      });
+      tdActions.appendChild(addBtn);
+    }
+    if (isLeaf) {
+      const delBtn = document.createElement("button");
+      delBtn.type = "button";
+      delBtn.className = "row-delete";
+      delBtn.title = "Remover este campo";
+      delBtn.textContent = "×";
+      delBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (!confirm(`Remover o campo "${node.name}"?`)) return;
+        const idx = parentArrayForDelete.indexOf(node);
+        if (idx >= 0) parentArrayForDelete.splice(idx, 1);
+        saveState();
+        renderTreeTable();
+      });
+      tdActions.appendChild(delBtn);
+    }
+    tr.appendChild(tdActions);
+    tbody.appendChild(tr);
+
+    if (hasKids && !collapsed) {
+      for (const child of kids) renderNode(child, nextKind, depth + 1, kids);
+    }
+  }
+
+  for (const section of state.tree) renderNode(section, "section", 0, null);
+
+  table.appendChild(tbody);
+  treeWrap.innerHTML = "";
+  treeWrap.appendChild(table);
+}
+
+function openMonthPicker(node, kind) {
+  // simplest: open drawer directly on the first visible month; user can switch inside via the month select
+  const months = visibleMonthList();
+  if (!months.length) return;
+  openDrawer(node, months[0], KIND_LABEL[kind]);
+}
+
+// ---------- flat tab ----------
+
+function renderFlatTable() {
   const months = visibleMonthList();
   const table = document.createElement("table");
   table.className = "dre-table";
@@ -137,7 +338,6 @@ function renderTable() {
   }
   const thActions = document.createElement("th");
   thActions.className = "col-actions";
-  thActions.textContent = "";
   headRow.appendChild(thActions);
   thead.appendChild(headRow);
   table.appendChild(thead);
@@ -153,7 +353,6 @@ function renderTable() {
       tbody.appendChild(tr);
       continue;
     }
-
     const tr = document.createElement("tr");
     tr.className = "row-leaf";
     const tdName = document.createElement("td");
@@ -161,27 +360,12 @@ function renderTable() {
     tdName.textContent = row.name;
     tdName.title = `Linha original da planilha: ${row.row}`;
     tr.appendChild(tdName);
-
-    for (const m of months) {
-      const td = document.createElement("td");
-      td.className = "cell-month";
-      const { conforme, div } = cellSummary(row.id, m.key);
-      const dots = document.createElement("div");
-      dots.className = "dots";
-      const cell = getCell(row.id, m.key);
-      for (const f of STATUS_FIELDS) {
-        const dot = document.createElement("span");
-        const val = cell[f.key] || "Não verificado";
-        dot.className = `dot dot-${statusTone(val)}`;
-        dot.title = `${f.label}: ${val}`;
-        dots.appendChild(dot);
-      }
-      td.appendChild(dots);
-      if (div > 0) td.classList.add("cell-has-div");
-      else if (conforme === STATUS_FIELDS.length) td.classList.add("cell-all-ok");
-      td.addEventListener("click", () => openDrawer(row, m));
-      tr.appendChild(td);
-    }
+    tr.appendChild(monthCellsFragment(row.id, months));
+    tr.addEventListener("click", (e) => {
+      if (e.target.closest(".row-delete")) return;
+      if (!months.length) return;
+      openDrawer(row, months[0], "Indicador");
+    });
 
     const tdActions = document.createElement("td");
     tdActions.className = "col-actions";
@@ -192,42 +376,49 @@ function renderTable() {
     delBtn.textContent = "×";
     delBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      if (!confirm(`Remover o indicador "${row.name}"? Os dados preenchidos dele neste protótipo serão perdidos.`)) return;
+      if (!confirm(`Remover o indicador "${row.name}"?`)) return;
       state.accounts = state.accounts.filter((a) => a.id !== row.id);
       for (const m of MONTHS) delete state.cells[cellKey(row.id, m.key)];
       saveState();
-      render();
+      renderFlatTable();
+      renderSummary();
     });
     tdActions.appendChild(delBtn);
     tr.appendChild(tdActions);
-
     tbody.appendChild(tr);
   }
   table.appendChild(tbody);
-
-  tableWrap.innerHTML = "";
-  tableWrap.appendChild(table);
+  flatWrap.innerHTML = "";
+  flatWrap.appendChild(table);
 }
+
+// ---------- summary (counts whatever tab is active) ----------
 
 function renderSummary() {
   const months = visibleMonthList();
-  const leaves = items();
-  let filled = 0, div = 0, na = 0;
-  const total = leaves.length * months.length * STATUS_FIELDS.length;
-  for (const row of leaves) {
+  let ids = [];
+  if (state.tab === "tree") {
+    walkTree(state.tree, "section", (node, kind) => {
+      if (kind === "campo") ids.push(node.id);
+    });
+  } else {
+    ids = items().map((a) => a.id);
+  }
+  let filled = 0, div = 0;
+  const total = ids.length * months.length * STATUS_FIELDS.length;
+  for (const id of ids) {
     for (const m of months) {
-      const cell = getCell(row.id, m.key);
+      const cell = getCell(id, m.key);
       for (const f of STATUS_FIELDS) {
         const v = cell[f.key];
         if (v) filled++;
         if (v === "Não Conforme") div++;
-        if (v === "Não se aplica") na++;
       }
     }
   }
   const pct = total ? Math.round((filled / total) * 100) : 0;
   summaryEl.innerHTML = `
-    <div class="stat"><span class="stat-value">${leaves.length}</span><span class="stat-label">indicadores</span></div>
+    <div class="stat"><span class="stat-value">${ids.length}</span><span class="stat-label">${state.tab === "tree" ? "campos auditados" : "indicadores"}</span></div>
     <div class="stat"><span class="stat-value">${months.length}</span><span class="stat-label">meses visíveis</span></div>
     <div class="stat"><span class="stat-value">${pct}%</span><span class="stat-label">campos verificados</span></div>
     <div class="stat stat-danger"><span class="stat-value">${div}</span><span class="stat-label">não conformes</span></div>
@@ -236,7 +427,21 @@ function renderSummary() {
 
 function render() {
   renderMonthFilter();
-  renderTable();
+  if (state.tab === "tree") {
+    treeWrap.hidden = false;
+    flatWrap.hidden = true;
+    addFormFlat.hidden = true;
+    tabTreeBtn.classList.add("tab-active");
+    tabFlatBtn.classList.remove("tab-active");
+    renderTreeTable();
+  } else {
+    treeWrap.hidden = true;
+    flatWrap.hidden = false;
+    addFormFlat.hidden = false;
+    tabTreeBtn.classList.remove("tab-active");
+    tabFlatBtn.classList.add("tab-active");
+    renderFlatTable();
+  }
   renderSummary();
 }
 
@@ -244,12 +449,28 @@ function render() {
 
 let drawerCtx = null;
 
-function openDrawer(row, month) {
-  drawerCtx = { accountId: row.id, accountName: row.name, monthKey: month.key, monthLabel: month.label };
-  const cell = getCell(row.id, month.key);
+function openDrawer(node, month, kindLabel) {
+  const months = visibleMonthList();
+  const useMonth = month || months[0];
+  if (!useMonth) return;
+  drawerCtx = { id: node.id, name: node.name, monthKey: useMonth.key };
+  const cell = getCell(node.id, useMonth.key);
 
-  document.getElementById("drawerTitle").textContent = row.name;
-  document.getElementById("drawerSubtitle").textContent = `${month.label} · linha ${row.row} na planilha original`;
+  document.getElementById("drawerTitle").textContent = node.name || "(sem nome)";
+  document.getElementById("drawerKind").textContent = kindLabel || "";
+
+  const monthSelectEl = document.getElementById("drawerMonth");
+  monthSelectEl.innerHTML = "";
+  for (const m of months) {
+    const o = document.createElement("option");
+    o.value = m.key;
+    o.textContent = m.label;
+    if (m.key === useMonth.key) o.selected = true;
+    monthSelectEl.appendChild(o);
+  }
+  monthSelectEl.onchange = () => openDrawer(node, MONTHS.find((m) => m.key === monthSelectEl.value), kindLabel);
+
+  document.getElementById("drawerSubtitle").textContent = `linha ${node.row ?? "—"} na planilha original`;
 
   const fieldsEl = document.getElementById("drawerFields");
   fieldsEl.innerHTML = "";
@@ -269,9 +490,8 @@ function openDrawer(row, month) {
     }
     select.addEventListener("change", () => {
       select.className = `select select-${statusTone(select.value)}`;
-      setCellField(drawerCtx.accountId, drawerCtx.monthKey, f.key, select.value);
-      renderTable();
-      renderSummary();
+      setCellField(drawerCtx.id, drawerCtx.monthKey, f.key, select.value);
+      render();
     });
     wrap.appendChild(select);
     fieldsEl.appendChild(wrap);
@@ -279,15 +499,11 @@ function openDrawer(row, month) {
 
   const valorInput = document.getElementById("drawerValor");
   valorInput.value = cell.valorBaseTarget || "";
-  valorInput.oninput = () => {
-    setCellField(drawerCtx.accountId, drawerCtx.monthKey, "valorBaseTarget", valorInput.value);
-  };
+  valorInput.oninput = () => setCellField(drawerCtx.id, drawerCtx.monthKey, "valorBaseTarget", valorInput.value);
 
   const obsInput = document.getElementById("drawerObservacoes");
   obsInput.value = cell.observacoes || "";
-  obsInput.oninput = () => {
-    setCellField(drawerCtx.accountId, drawerCtx.monthKey, "observacoes", obsInput.value);
-  };
+  obsInput.oninput = () => setCellField(drawerCtx.id, drawerCtx.monthKey, "observacoes", obsInput.value);
 
   drawerEl.classList.add("drawer-open");
   drawerBackdrop.classList.add("backdrop-visible");
@@ -305,6 +521,8 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") closeDrawer();
 });
 
+// ---------- toolbar ----------
+
 document.getElementById("btnAllMonths").addEventListener("click", () => {
   state.visibleMonths = MONTHS.map((m) => m.key);
   saveState();
@@ -318,26 +536,37 @@ document.getElementById("btnOriginalMonths").addEventListener("click", () => {
 document.getElementById("btnReset").addEventListener("click", () => {
   if (!confirm("Restaurar o protótipo para os dados originais da planilha? Suas edições locais serão perdidas.")) return;
   state = {
+    tab: state.tab,
+    tree: cloneTree(),
     accounts: cloneAccounts(),
     cells: {},
     visibleMonths: MONTHS.filter((m) => m.inOriginal).map((m) => m.key),
+    collapsed: {},
   };
   saveState();
   render();
 });
 
-const addForm = document.getElementById("addForm");
-const addInput = document.getElementById("addInput");
-addForm.addEventListener("submit", (e) => {
-  e.preventDefault();
-  const name = addInput.value.trim();
-  if (!name) return;
-  const id = `custom-${Date.now()}`;
-  state.accounts.push({ id, name, row: null, type: "item" });
-  addInput.value = "";
+tabTreeBtn.addEventListener("click", () => {
+  state.tab = "tree";
   saveState();
   render();
-  tableWrap.scrollTop = tableWrap.scrollHeight;
+});
+tabFlatBtn.addEventListener("click", () => {
+  state.tab = "flat";
+  saveState();
+  render();
+});
+
+addFormFlat.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const name = addInputFlat.value.trim();
+  if (!name) return;
+  state.accounts.push({ id: `custom-${Date.now()}`, name, row: null, type: "item" });
+  addInputFlat.value = "";
+  saveState();
+  renderFlatTable();
+  renderSummary();
 });
 
 render();

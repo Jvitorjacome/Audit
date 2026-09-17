@@ -17,9 +17,15 @@
 
   <div class="notice">
     Protótipo rodando só neste navegador (dados salvos em <code>localStorage</code>, nada é enviado a lugar nenhum).
-    Os 956 indicadores e os valores já preenchidos foram importados de verdade das linhas 5–982 da aba DRE (a área da DFC, a partir da linha 988, não entra aqui).
+    A aba <strong>Auditoria por propriedade</strong> reconstrói Canal → Propriedade → Centro de custo → Campo para
+    Bed&amp;Breakfast Manager, Bed&amp;Breakfast Leasing e Building management (linhas 272–857 da aba DRE).
+    O restante da DRE (receita, impostos, resultado) fica na aba <strong>Lista completa</strong>.
     Meses marcados com <strong>•</strong> não existiam na estrutura original da planilha — aqui já nascem prontos, sem lacunas.
-    Próxima etapa: ligar isto à API do Google Sheets para sincronizar de verdade.
+  </div>
+
+  <div class="tabs">
+    <button class="tab" id="tabTree" type="button">Auditoria por propriedade</button>
+    <button class="tab" id="tabFlat" type="button">Lista completa (demais linhas da DRE)</button>
   </div>
 
   <div class="toolbar">
@@ -38,20 +44,27 @@
     <button class="btn btn-accent" type="submit">+ Adicionar indicador</button>
   </form>
 
-  <div class="table-scroll" id="tableWrap"></div>
+  <div class="table-scroll" id="treeWrap"></div>
+  <div class="table-scroll" id="flatWrap" hidden></div>
 
-  <p class="footer-note">Clique numa célula de mês para abrir os 5 indicadores de status daquele item. Use o × na linha para remover um indicador.</p>
+  <p class="footer-note">Clique numa linha para abrir seus campos de status. Na aba de auditoria, use ▾/▸ para recolher, + para adicionar um campo num centro de custo, e × para remover.</p>
 </div>
 
 <div class="backdrop" id="drawerBackdrop"></div>
 <aside class="drawer" id="drawer">
   <div class="drawer-header">
     <div>
+      <span class="drawer-kind" id="drawerKind"></span>
       <h2 id="drawerTitle">Conta</h2>
       <p id="drawerSubtitle">Mês</p>
     </div>
     <button class="drawer-close" id="drawerClose" type="button" aria-label="Fechar">✕</button>
   </div>
+
+  <label class="field">
+    <span class="field-label">Mês</span>
+    <select class="select" id="drawerMonth"></select>
+  </label>
 
   <div id="drawerFields" style="display:flex; flex-direction:column; gap:14px;"></div>
 

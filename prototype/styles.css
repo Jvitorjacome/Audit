@@ -236,7 +236,9 @@ thead .col-account { background: var(--surface-2); z-index: 2; }
   vertical-align: middle;
 }
 
-.cell-month { cursor: pointer; transition: background 0.1s ease; }
+.row-tree, .row-leaf { cursor: pointer; }
+.row-tree:hover .col-account, .row-leaf:hover .col-account { background: var(--accent-weak); }
+.cell-month { transition: background 0.1s ease; }
 .cell-month:hover { background: var(--accent-weak); }
 .cell-all-ok { background: color-mix(in srgb, var(--ok-bg) 55%, transparent); }
 .cell-has-div { background: color-mix(in srgb, var(--div-bg) 55%, transparent); }
@@ -268,6 +270,70 @@ thead .col-account { background: var(--surface-2); z-index: 2; }
   height: 26px;
 }
 .row-delete:hover { background: var(--div-bg); color: var(--div-fg); }
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.tab {
+  font-family: inherit;
+  font-size: 0.85rem;
+  padding: 9px 14px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.tab:hover { color: var(--text); }
+.tab-active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+
+.toggle {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  width: 18px;
+  display: inline-block;
+  font-size: 0.7rem;
+  padding: 0;
+}
+.toggle-spacer { display: inline-block; width: 18px; }
+
+.node-count { color: var(--text-muted); font-size: 0.78rem; }
+
+.row-kind-section .col-account { font-weight: 700; background: var(--surface-2); }
+.row-kind-channel .col-account { font-weight: 600; color: var(--accent); }
+.row-kind-property .col-account { font-weight: 600; }
+.row-kind-centro .col-account { color: var(--text-muted); font-style: italic; }
+
+.row-add {
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 6px;
+  width: 26px;
+  height: 26px;
+}
+.row-add:hover { background: var(--accent-weak); }
+
+.drawer-kind {
+  display: inline-block;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+  background: var(--accent-weak);
+  border-radius: 999px;
+  padding: 2px 8px;
+  margin-bottom: 4px;
+}
 
 .add-form {
   display: flex;
