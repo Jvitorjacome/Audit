@@ -17,6 +17,7 @@
 
   <div class="notice">
     Protótipo rodando só neste navegador (dados salvos em <code>localStorage</code>, nada é enviado a lugar nenhum).
+    Os 956 indicadores e os valores já preenchidos foram importados de verdade das linhas 5–982 da aba DRE (a área da DFC, a partir da linha 988, não entra aqui).
     Meses marcados com <strong>•</strong> não existiam na estrutura original da planilha — aqui já nascem prontos, sem lacunas.
     Próxima etapa: ligar isto à API do Google Sheets para sincronizar de verdade.
   </div>
@@ -32,9 +33,14 @@
 
   <div class="summary" id="summary"></div>
 
+  <form class="add-form" id="addForm">
+    <input class="text-input" id="addInput" type="text" placeholder="Nome do novo indicador (ex.: Taxa de administração — Cond. X)">
+    <button class="btn btn-accent" type="submit">+ Adicionar indicador</button>
+  </form>
+
   <div class="table-scroll" id="tableWrap"></div>
 
-  <p class="footer-note">Clique numa célula de mês para abrir os 5 indicadores de status daquela conta.</p>
+  <p class="footer-note">Clique numa célula de mês para abrir os 5 indicadores de status daquele item. Use o × na linha para remover um indicador.</p>
 </div>
 
 <div class="backdrop" id="drawerBackdrop"></div>
@@ -52,7 +58,7 @@
   <hr class="drawer-divider">
 
   <label class="field">
-    <span class="field-label">Valor no banco (R$)</span>
+    <span class="field-label">Valor base/target</span>
     <input class="text-input" id="drawerValor" type="text" placeholder="Ex.: 4.370,82">
   </label>
 

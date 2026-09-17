@@ -13,6 +13,8 @@
   --div-fg: #b3261e;
   --unv-bg: #eef0f4;
   --unv-fg: #5b6472;
+  --na-bg: #e7ecf7;
+  --na-fg: #44548c;
   --radius: 10px;
   --shadow: 0 8px 24px rgba(20, 24, 32, 0.12);
 }
@@ -33,6 +35,8 @@
     --div-fg: #f2867f;
     --unv-bg: #212734;
     --unv-fg: #9aa3b2;
+    --na-bg: #1e2740;
+    --na-fg: #9db0e8;
     --shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   }
 }
@@ -52,6 +56,8 @@
   --div-fg: #f2867f;
   --unv-bg: #212734;
   --unv-fg: #9aa3b2;
+  --na-bg: #1e2740;
+  --na-fg: #9db0e8;
   --shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
@@ -230,14 +236,6 @@ thead .col-account { background: var(--surface-2); z-index: 2; }
   vertical-align: middle;
 }
 
-.row-category .col-account {
-  font-weight: 600;
-  color: var(--text);
-  background: var(--surface-2);
-}
-
-.cell-category { background: var(--surface-2); }
-
 .cell-month { cursor: pointer; transition: background 0.1s ease; }
 .cell-month:hover { background: var(--accent-weak); }
 .cell-all-ok { background: color-mix(in srgb, var(--ok-bg) 55%, transparent); }
@@ -247,7 +245,38 @@ thead .col-account { background: var(--surface-2); z-index: 2; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--unv-fg); opacity: 0.35; }
 .dot-ok { background: var(--ok-fg); opacity: 1; }
 .dot-div { background: var(--div-fg); opacity: 1; }
+.dot-na { background: var(--na-fg); opacity: 0.85; }
 .dot-unv { background: var(--unv-fg); opacity: 0.35; }
+
+.row-separator td {
+  padding: 3px 0;
+  border-bottom: none;
+  background: var(--bg);
+}
+
+.col-actions { width: 36px; text-align: center; }
+
+.row-delete {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 1.05rem;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 6px;
+  width: 26px;
+  height: 26px;
+}
+.row-delete:hover { background: var(--div-bg); color: var(--div-fg); }
+
+.add-form {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.add-form .text-input { flex: 1; min-width: 220px; }
+.btn-accent { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-accent:hover { opacity: 0.9; color: #fff; }
 
 .backdrop {
   position: fixed;
@@ -317,6 +346,7 @@ thead .col-account { background: var(--surface-2); z-index: 2; }
 }
 .select-ok { background: var(--ok-bg); color: var(--ok-fg); border-color: var(--ok-fg); }
 .select-div { background: var(--div-bg); color: var(--div-fg); border-color: var(--div-fg); }
+.select-na { background: var(--na-bg); color: var(--na-fg); border-color: var(--na-fg); }
 .select-unv { background: var(--unv-bg); color: var(--unv-fg); }
 
 .text-input, .textarea {

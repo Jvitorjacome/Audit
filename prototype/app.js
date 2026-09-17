@@ -1,28 +1,31 @@
-const STORAGE_KEY = "dre-prototype-state-v1";
+const STORAGE_KEY = "dre-prototype-state-v2";
 
-function flattenLeaves(nodes, depth = 0, out = []) {
-  for (const node of nodes) {
-    const hasChildren = Array.isArray(node.children) && node.children.length > 0;
-    out.push({ id: node.id, name: node.name, depth, hasChildren });
-    if (hasChildren) flattenLeaves(node.children, depth + 1, out);
-  }
-  return out;
+function cloneAccounts() {
+  return SEED_ACCOUNTS.map((a) => ({ ...a }));
 }
-
-const ROWS = flattenLeaves(ACCOUNT_TREE);
 
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { cells: {}, visibleMonths: null, collapsed: {} };
+    if (!raw) {
+      return {
+        accounts: cloneAccounts(),
+        cells: {},
+        visibleMonths: MONTHS.filter((m) => m.inOriginal).map((m) => m.key),
+      };
+    }
     const parsed = JSON.parse(raw);
     return {
+      accounts: parsed.accounts || cloneAccounts(),
       cells: parsed.cells || {},
-      visibleMonths: parsed.visibleMonths || null,
-      collapsed: parsed.collapsed || {},
+      visibleMonths: parsed.visibleMonths || MONTHS.filter((m) => m.inOriginal).map((m) => m.key),
     };
   } catch (e) {
-    return { cells: {}, visibleMonths: null, collapsed: {} };
+    return {
+      accounts: cloneAccounts(),
+      cells: {},
+      visibleMonths: MONTHS.filter((m) => m.inOriginal).map((m) => m.key),
+    };
   }
 }
 
@@ -35,53 +38,46 @@ function saveState() {
 }
 
 let state = loadState();
-if (!state.visibleMonths) {
-  state.visibleMonths = MONTHS.filter((m) => m.inOriginal).map((m) => m.key);
-}
 
 function cellKey(accountId, monthKey) {
   return `${accountId}::${monthKey}`;
 }
 
 function getCell(accountId, monthKey) {
-  return (
-    state.cells[cellKey(accountId, monthKey)] || {
-      statuses: {},
-      observacoes: "",
-      valor: "",
-    }
-  );
+  const key = cellKey(accountId, monthKey);
+  const seed = SEED_CELLS[key] || {};
+  const override = state.cells[key] || {};
+  return { ...seed, ...override };
 }
 
-function setCell(accountId, monthKey, patch) {
+function setCellField(accountId, monthKey, field, value) {
   const key = cellKey(accountId, monthKey);
   const current = getCell(accountId, monthKey);
-  state.cells[key] = { ...current, ...patch };
+  state.cells[key] = { ...current, [field]: value };
   saveState();
 }
 
 function statusTone(value) {
-  if (value === "OK") return "ok";
-  if (value === "Divergente") return "div";
+  if (value === "Conforme") return "ok";
+  if (value === "Não Conforme") return "div";
+  if (value === "Não se aplica") return "na";
   return "unv";
 }
 
 function cellSummary(accountId, monthKey) {
   const cell = getCell(accountId, monthKey);
-  let ok = 0, div = 0, unv = 0;
+  let conforme = 0, div = 0, other = 0;
   for (const f of STATUS_FIELDS) {
-    const v = cell.statuses[f.key] || "Não verificado";
-    if (v === "OK") ok++;
-    else if (v === "Divergente") div++;
-    else unv++;
+    const v = cell[f.key] || "Não verificado";
+    if (v === "Conforme") conforme++;
+    else if (v === "Não Conforme") div++;
+    else other++;
   }
-  return { ok, div, unv };
+  return { conforme, div, other };
 }
 
-function isRowVisible(row) {
-  if (row.hasChildren) return true;
-  // a leaf is hidden if any ancestor category is collapsed
-  return true;
+function items() {
+  return state.accounts.filter((a) => a.type === "item");
 }
 
 // ---------- rendering ----------
@@ -131,7 +127,7 @@ function renderTable() {
   const headRow = document.createElement("tr");
   const thAccount = document.createElement("th");
   thAccount.className = "col-account";
-  thAccount.textContent = "Conta";
+  thAccount.textContent = `Indicador (${items().length})`;
   headRow.appendChild(thAccount);
   for (const m of months) {
     const th = document.createElement("th");
@@ -139,45 +135,72 @@ function renderTable() {
     if (!m.inOriginal) th.classList.add("th-new");
     headRow.appendChild(th);
   }
+  const thActions = document.createElement("th");
+  thActions.className = "col-actions";
+  thActions.textContent = "";
+  headRow.appendChild(thActions);
   thead.appendChild(headRow);
   table.appendChild(thead);
 
   const tbody = document.createElement("tbody");
-  for (const row of ROWS) {
+  for (const row of state.accounts) {
+    if (row.type === "separator") {
+      const tr = document.createElement("tr");
+      tr.className = "row-separator";
+      const td = document.createElement("td");
+      td.colSpan = months.length + 2;
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+      continue;
+    }
+
     const tr = document.createElement("tr");
-    tr.className = row.hasChildren ? "row-category" : "row-leaf";
+    tr.className = "row-leaf";
     const tdName = document.createElement("td");
     tdName.className = "col-account";
-    tdName.style.paddingLeft = `${12 + row.depth * 18}px`;
     tdName.textContent = row.name;
+    tdName.title = `Linha original da planilha: ${row.row}`;
     tr.appendChild(tdName);
 
-    if (row.hasChildren) {
-      const tdSpan = document.createElement("td");
-      tdSpan.colSpan = months.length;
-      tdSpan.className = "cell-category";
-      tr.appendChild(tdSpan);
-    } else {
-      for (const m of months) {
-        const td = document.createElement("td");
-        td.className = "cell-month";
-        const { ok, div, unv } = cellSummary(row.id, m.key);
-        const dots = document.createElement("div");
-        dots.className = "dots";
-        const cell = getCell(row.id, m.key);
-        for (const f of STATUS_FIELDS) {
-          const dot = document.createElement("span");
-          dot.className = `dot dot-${statusTone(cell.statuses[f.key])}`;
-          dot.title = `${f.label}: ${cell.statuses[f.key] || "Não verificado"}`;
-          dots.appendChild(dot);
-        }
-        td.appendChild(dots);
-        if (div > 0) td.classList.add("cell-has-div");
-        else if (ok === STATUS_FIELDS.length) td.classList.add("cell-all-ok");
-        td.addEventListener("click", () => openDrawer(row, m));
-        tr.appendChild(td);
+    for (const m of months) {
+      const td = document.createElement("td");
+      td.className = "cell-month";
+      const { conforme, div } = cellSummary(row.id, m.key);
+      const dots = document.createElement("div");
+      dots.className = "dots";
+      const cell = getCell(row.id, m.key);
+      for (const f of STATUS_FIELDS) {
+        const dot = document.createElement("span");
+        const val = cell[f.key] || "Não verificado";
+        dot.className = `dot dot-${statusTone(val)}`;
+        dot.title = `${f.label}: ${val}`;
+        dots.appendChild(dot);
       }
+      td.appendChild(dots);
+      if (div > 0) td.classList.add("cell-has-div");
+      else if (conforme === STATUS_FIELDS.length) td.classList.add("cell-all-ok");
+      td.addEventListener("click", () => openDrawer(row, m));
+      tr.appendChild(td);
     }
+
+    const tdActions = document.createElement("td");
+    tdActions.className = "col-actions";
+    const delBtn = document.createElement("button");
+    delBtn.type = "button";
+    delBtn.className = "row-delete";
+    delBtn.title = "Remover este indicador";
+    delBtn.textContent = "×";
+    delBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (!confirm(`Remover o indicador "${row.name}"? Os dados preenchidos dele neste protótipo serão perdidos.`)) return;
+      state.accounts = state.accounts.filter((a) => a.id !== row.id);
+      for (const m of MONTHS) delete state.cells[cellKey(row.id, m.key)];
+      saveState();
+      render();
+    });
+    tdActions.appendChild(delBtn);
+    tr.appendChild(tdActions);
+
     tbody.appendChild(tr);
   }
   table.appendChild(tbody);
@@ -188,24 +211,26 @@ function renderTable() {
 
 function renderSummary() {
   const months = visibleMonthList();
-  const leaves = ROWS.filter((r) => !r.hasChildren);
-  let filled = 0, div = 0, total = leaves.length * months.length * STATUS_FIELDS.length;
+  const leaves = items();
+  let filled = 0, div = 0, na = 0;
+  const total = leaves.length * months.length * STATUS_FIELDS.length;
   for (const row of leaves) {
     for (const m of months) {
       const cell = getCell(row.id, m.key);
       for (const f of STATUS_FIELDS) {
-        const v = cell.statuses[f.key];
+        const v = cell[f.key];
         if (v) filled++;
-        if (v === "Divergente") div++;
+        if (v === "Não Conforme") div++;
+        if (v === "Não se aplica") na++;
       }
     }
   }
   const pct = total ? Math.round((filled / total) * 100) : 0;
   summaryEl.innerHTML = `
-    <div class="stat"><span class="stat-value">${leaves.length}</span><span class="stat-label">contas</span></div>
+    <div class="stat"><span class="stat-value">${leaves.length}</span><span class="stat-label">indicadores</span></div>
     <div class="stat"><span class="stat-value">${months.length}</span><span class="stat-label">meses visíveis</span></div>
     <div class="stat"><span class="stat-value">${pct}%</span><span class="stat-label">campos verificados</span></div>
-    <div class="stat stat-danger"><span class="stat-value">${div}</span><span class="stat-label">divergências</span></div>
+    <div class="stat stat-danger"><span class="stat-value">${div}</span><span class="stat-label">não conformes</span></div>
   `;
 }
 
@@ -224,14 +249,14 @@ function openDrawer(row, month) {
   const cell = getCell(row.id, month.key);
 
   document.getElementById("drawerTitle").textContent = row.name;
-  document.getElementById("drawerSubtitle").textContent = month.label;
+  document.getElementById("drawerSubtitle").textContent = `${month.label} · linha ${row.row} na planilha original`;
 
   const fieldsEl = document.getElementById("drawerFields");
   fieldsEl.innerHTML = "";
   for (const f of STATUS_FIELDS) {
     const wrap = document.createElement("label");
     wrap.className = "field";
-    const value = cell.statuses[f.key] || "Não verificado";
+    const value = cell[f.key] || "Não verificado";
     wrap.innerHTML = `<span class="field-label">${f.label}</span>`;
     const select = document.createElement("select");
     select.className = `select select-${statusTone(value)}`;
@@ -244,10 +269,7 @@ function openDrawer(row, month) {
     }
     select.addEventListener("change", () => {
       select.className = `select select-${statusTone(select.value)}`;
-      const c = getCell(drawerCtx.accountId, drawerCtx.monthKey);
-      setCell(drawerCtx.accountId, drawerCtx.monthKey, {
-        statuses: { ...c.statuses, [f.key]: select.value },
-      });
+      setCellField(drawerCtx.accountId, drawerCtx.monthKey, f.key, select.value);
       renderTable();
       renderSummary();
     });
@@ -256,15 +278,15 @@ function openDrawer(row, month) {
   }
 
   const valorInput = document.getElementById("drawerValor");
-  valorInput.value = cell.valor || "";
+  valorInput.value = cell.valorBaseTarget || "";
   valorInput.oninput = () => {
-    setCell(drawerCtx.accountId, drawerCtx.monthKey, { valor: valorInput.value });
+    setCellField(drawerCtx.accountId, drawerCtx.monthKey, "valorBaseTarget", valorInput.value);
   };
 
   const obsInput = document.getElementById("drawerObservacoes");
   obsInput.value = cell.observacoes || "";
   obsInput.oninput = () => {
-    setCell(drawerCtx.accountId, drawerCtx.monthKey, { observacoes: obsInput.value });
+    setCellField(drawerCtx.accountId, drawerCtx.monthKey, "observacoes", obsInput.value);
   };
 
   drawerEl.classList.add("drawer-open");
@@ -294,10 +316,28 @@ document.getElementById("btnOriginalMonths").addEventListener("click", () => {
   render();
 });
 document.getElementById("btnReset").addEventListener("click", () => {
-  if (!confirm("Limpar todos os dados preenchidos neste protótipo local?")) return;
-  state = { cells: {}, visibleMonths: MONTHS.filter((m) => m.inOriginal).map((m) => m.key), collapsed: {} };
+  if (!confirm("Restaurar o protótipo para os dados originais da planilha? Suas edições locais serão perdidas.")) return;
+  state = {
+    accounts: cloneAccounts(),
+    cells: {},
+    visibleMonths: MONTHS.filter((m) => m.inOriginal).map((m) => m.key),
+  };
   saveState();
   render();
+});
+
+const addForm = document.getElementById("addForm");
+const addInput = document.getElementById("addInput");
+addForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const name = addInput.value.trim();
+  if (!name) return;
+  const id = `custom-${Date.now()}`;
+  state.accounts.push({ id, name, row: null, type: "item" });
+  addInput.value = "";
+  saveState();
+  render();
+  tableWrap.scrollTop = tableWrap.scrollHeight;
 });
 
 render();
