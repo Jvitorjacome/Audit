@@ -46,7 +46,7 @@ Em **qualquer linha** da árvore:
 
 Isso cobre o caso de auditoria real: uma propriedade nova entra na empresa → adiciona o Estado (se ainda não existir) → adiciona a Propriedade → adiciona os Centros de custo → adiciona os Campos. Tudo fica salvo no navegador (`localStorage`), incluindo tudo que for adicionado ou removido.
 
-Clicar em qualquer linha (não só nos campos-folha — todo nível tem dados reais de auditoria próprios vindos da planilha) abre o painel com os 5 status (`Conforme / Não Conforme / Não se aplica / Não verificado`), campo `Valor base/target` e observações, com seletor de mês dentro do painel.
+Os 5 status (`Conforme / Não Conforme / Não se aplica / Não verificado`) pertencem só ao **Campo** — é o único nível clicável que abre o painel de edição, com campo `Valor base/target`, observações e seletor de mês. Estado, Propriedade e Centro de custo não têm status próprio: em vez disso, mostram uma **barra de progresso** somando os campos auditados abaixo deles (% conforme em verde, contagem de não conformes em vermelho), então dá para ver de relance quanto de uma propriedade ou estado já foi auditado sem abrir cada campo.
 
 ## Limitações conhecidas (é um protótipo)
 

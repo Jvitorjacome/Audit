@@ -115,6 +115,30 @@ function countLeaves(node, kind) {
   const nextKind = childKind(kind);
   return kids.reduce((sum, k) => sum + countLeaves(k, nextKind), 0);
 }
+
+// Audit status only ever belongs to a campo (the thing actually being audited).
+// Everything above it (centro de custo, propriedade, estado, seção) is a grouping,
+// so instead of its own status it shows a rolled-up bar over its descendant campos.
+function aggregateAudit(node, kind, months) {
+  let conforme = 0, naoConforme = 0, total = 0;
+  function visitCampo(campo) {
+    for (const m of months) {
+      const cell = getCell(campo.id, m.key);
+      for (const f of STATUS_FIELDS) {
+        total++;
+        const v = cell[f.key] || "Não verificado";
+        if (v === "Conforme") conforme++;
+        else if (v === "Não Conforme") naoConforme++;
+      }
+    }
+  }
+  function walk(n, k) {
+    if (k === "campo") { visitCampo(n); return; }
+    for (const child of childrenOf(n, k)) walk(child, childKind(k));
+  }
+  walk(node, kind);
+  return { conforme, naoConforme, total };
+}
 function countDescendantNodes(node, kind) {
   const kids = childrenOf(node, kind);
   if (!kids) return 0;
@@ -176,6 +200,35 @@ function monthCellsFragment(id, months) {
     frag.appendChild(td);
   }
   return frag;
+}
+
+function auditBarCell(node, kind, months) {
+  const td = document.createElement("td");
+  td.className = "cell-auditbar";
+  td.colSpan = Math.max(months.length, 1);
+  const { conforme, naoConforme, total } = aggregateAudit(node, kind, months);
+  const pctOk = total ? (conforme / total) * 100 : 0;
+  const pctDiv = total ? (naoConforme / total) * 100 : 0;
+
+  const bar = document.createElement("div");
+  bar.className = "auditbar";
+  const segOk = document.createElement("span");
+  segOk.className = "auditbar-seg auditbar-ok";
+  segOk.style.width = `${pctOk}%`;
+  const segDiv = document.createElement("span");
+  segDiv.className = "auditbar-seg auditbar-div";
+  segDiv.style.width = `${pctDiv}%`;
+  bar.appendChild(segOk);
+  bar.appendChild(segDiv);
+
+  const label = document.createElement("span");
+  label.className = "auditbar-label";
+  label.textContent = total ? `${Math.round(pctOk)}% conforme · ${naoConforme} não conforme` : "sem campos";
+
+  td.appendChild(bar);
+  td.appendChild(label);
+  td.title = `${conforme} conforme, ${naoConforme} não conforme, de ${total} avaliações (campos × meses × indicadores) nesta ramificação`;
+  return td;
 }
 
 // ---------- tree rendering ----------
@@ -257,11 +310,15 @@ function renderTreeTable() {
     }
     tr.appendChild(tdName);
 
-    tr.appendChild(monthCellsFragment(node.id, months));
-    tr.addEventListener("click", (e) => {
-      if (e.target.closest("button")) return;
-      openDrawer(node, months[0], KIND_LABEL[kind]);
-    });
+    if (kind === "campo") {
+      tr.appendChild(monthCellsFragment(node.id, months));
+      tr.addEventListener("click", (e) => {
+        if (e.target.closest("button")) return;
+        openDrawer(node, months[0], KIND_LABEL[kind]);
+      });
+    } else {
+      tr.appendChild(auditBarCell(node, kind, months));
+    }
 
     const tdActions = document.createElement("td");
     tdActions.className = "col-actions";

@@ -266,6 +266,26 @@ thead .col-account { background: var(--surface-2); z-index: 2; }
 .cell-all-ok { background: color-mix(in srgb, var(--ok-bg) 55%, transparent); }
 .cell-has-div { background: color-mix(in srgb, var(--div-bg) 55%, transparent); }
 
+.cell-auditbar { min-width: 220px; }
+.auditbar {
+  position: relative;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--unv-bg);
+  overflow: hidden;
+  display: flex;
+}
+.auditbar-seg { display: block; height: 100%; }
+.auditbar-ok { background: var(--ok-fg); }
+.auditbar-div { background: var(--div-fg); }
+.auditbar-label {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-family: "IBM Plex Mono", monospace;
+}
+
 .dots { display: flex; gap: 4px; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--unv-fg); opacity: 0.35; }
 .dot-ok { background: var(--ok-fg); opacity: 1; }
