@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DRE Independente</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="wrap">
+  <header class="page-header">
+    <h1>DRE Independente — protótipo local</h1>
+    <p>Grade de indicadores de auditoria com menus suspensos de status e filtro de meses, desacoplada da planilha original.</p>
+  </header>
+
+  <div class="notice">
+    Protótipo rodando só neste navegador (dados salvos em <code>localStorage</code>, nada é enviado a lugar nenhum).
+    Meses marcados com <strong>•</strong> não existiam na estrutura original da planilha — aqui já nascem prontos, sem lacunas.
+    Próxima etapa: ligar isto à API do Google Sheets para sincronizar de verdade.
+  </div>
+
+  <div class="toolbar">
+    <div class="month-filter" id="monthFilter"></div>
+    <div class="btn-row">
+      <button class="btn" id="btnOriginalMonths" type="button">Só meses da planilha original</button>
+      <button class="btn" id="btnAllMonths" type="button">Mostrar ano inteiro</button>
+      <button class="btn btn-danger" id="btnReset" type="button">Limpar dados locais</button>
+    </div>
+  </div>
+
+  <div class="summary" id="summary"></div>
+
+  <div class="table-scroll" id="tableWrap"></div>
+
+  <p class="footer-note">Clique numa célula de mês para abrir os 5 indicadores de status daquela conta.</p>
+</div>
+
+<div class="backdrop" id="drawerBackdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-header">
+    <div>
+      <h2 id="drawerTitle">Conta</h2>
+      <p id="drawerSubtitle">Mês</p>
+    </div>
+    <button class="drawer-close" id="drawerClose" type="button" aria-label="Fechar">✕</button>
+  </div>
+
+  <div id="drawerFields" style="display:flex; flex-direction:column; gap:14px;"></div>
+
+  <hr class="drawer-divider">
+
+  <label class="field">
+    <span class="field-label">Valor no banco (R$)</span>
+    <input class="text-input" id="drawerValor" type="text" placeholder="Ex.: 4.370,82">
+  </label>
+
+  <label class="field">
+    <span class="field-label">Observações</span>
+    <textarea class="textarea" id="drawerObservacoes" rows="4" placeholder="Notas livres do auditor..."></textarea>
+  </label>
+</aside>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
