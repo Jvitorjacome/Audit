@@ -15,6 +15,14 @@
   --unv-fg: #5b6472;
   --na-bg: #e7ecf7;
   --na-fg: #44548c;
+  --lvl-section-bg: #1b1f27;
+  --lvl-section-fg: #ffffff;
+  --lvl-estado-bg: #dbe6f9;
+  --lvl-estado-fg: #1d4d94;
+  --lvl-prop-bg: #dcf3ef;
+  --lvl-prop-fg: #0f6b60;
+  --lvl-centro-bg: #fbead0;
+  --lvl-centro-fg: #93590c;
   --radius: 10px;
   --shadow: 0 8px 24px rgba(20, 24, 32, 0.12);
 }
@@ -37,6 +45,14 @@
     --unv-fg: #9aa3b2;
     --na-bg: #1e2740;
     --na-fg: #9db0e8;
+    --lvl-section-bg: #05070a;
+    --lvl-section-fg: #f2f4f8;
+    --lvl-estado-bg: #1c2b4a;
+    --lvl-estado-fg: #9cc0f5;
+    --lvl-prop-bg: #123330;
+    --lvl-prop-fg: #7fe0cf;
+    --lvl-centro-bg: #3a2a10;
+    --lvl-centro-fg: #f5c273;
     --shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   }
 }
@@ -58,6 +74,14 @@
   --unv-fg: #9aa3b2;
   --na-bg: #1e2740;
   --na-fg: #9db0e8;
+  --lvl-section-bg: #05070a;
+  --lvl-section-fg: #f2f4f8;
+  --lvl-estado-bg: #1c2b4a;
+  --lvl-estado-fg: #9cc0f5;
+  --lvl-prop-bg: #123330;
+  --lvl-prop-fg: #7fe0cf;
+  --lvl-centro-bg: #3a2a10;
+  --lvl-centro-fg: #f5c273;
   --shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
@@ -236,8 +260,7 @@ thead .col-account { background: var(--surface-2); z-index: 2; }
   vertical-align: middle;
 }
 
-.row-tree, .row-leaf { cursor: pointer; }
-.row-tree:hover .col-account, .row-leaf:hover .col-account { background: var(--accent-weak); }
+.row-tree { cursor: pointer; }
 .cell-month { transition: background 0.1s ease; }
 .cell-month:hover { background: var(--accent-weak); }
 .cell-all-ok { background: color-mix(in srgb, var(--ok-bg) 55%, transparent); }
@@ -249,12 +272,6 @@ thead .col-account { background: var(--surface-2); z-index: 2; }
 .dot-div { background: var(--div-fg); opacity: 1; }
 .dot-na { background: var(--na-fg); opacity: 0.85; }
 .dot-unv { background: var(--unv-fg); opacity: 0.35; }
-
-.row-separator td {
-  padding: 3px 0;
-  border-bottom: none;
-  background: var(--bg);
-}
 
 .col-actions { width: 36px; text-align: center; }
 
@@ -271,24 +288,23 @@ thead .col-account { background: var(--surface-2); z-index: 2; }
 }
 .row-delete:hover { background: var(--div-bg); color: var(--div-fg); }
 
-.tabs {
+.legend {
   display: flex;
-  gap: 4px;
-  border-bottom: 1px solid var(--border);
-}
-.tab {
-  font-family: inherit;
-  font-size: 0.85rem;
-  padding: 9px 14px;
-  border: none;
-  background: transparent;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+  font-size: 0.78rem;
   color: var(--text-muted);
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
 }
-.tab:hover { color: var(--text); }
-.tab-active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+.legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--unv-fg);
+  opacity: 0.6;
+  display: inline-block;
+}
 
 .toggle {
   border: none;
@@ -302,12 +318,59 @@ thead .col-account { background: var(--surface-2); z-index: 2; }
 }
 .toggle-spacer { display: inline-block; width: 18px; }
 
-.node-count { color: var(--text-muted); font-size: 0.78rem; }
+.node-count { color: var(--text-muted); font-size: 0.78rem; font-weight: 400; }
+.node-name { vertical-align: middle; }
 
-.row-kind-section .col-account { font-weight: 700; background: var(--surface-2); }
-.row-kind-channel .col-account { font-weight: 600; color: var(--accent); }
-.row-kind-property .col-account { font-weight: 600; }
-.row-kind-centro .col-account { color: var(--text-muted); font-style: italic; }
+.kind-badge {
+  display: inline-block;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-radius: 5px;
+  padding: 2px 6px;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+.kind-badge-channel { background: var(--lvl-estado-fg); color: var(--lvl-estado-bg); }
+.kind-badge-property { background: var(--lvl-prop-fg); color: var(--lvl-prop-bg); }
+.kind-badge-centro { background: var(--lvl-centro-fg); color: var(--lvl-centro-bg); }
+
+/* Seção: banda escura de topo de hierarquia */
+.row-kind-section td { background: var(--lvl-section-bg); border-bottom-color: var(--lvl-section-bg); }
+.row-kind-section .col-account {
+  background: var(--lvl-section-bg);
+  color: var(--lvl-section-fg);
+  font-weight: 700;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+.row-kind-section .toggle { color: var(--lvl-section-fg); }
+.row-kind-section .node-count { color: rgba(255, 255, 255, 0.6); }
+.row-kind-section:hover .col-account { background: var(--lvl-section-bg); }
+
+/* Estado */
+.row-kind-channel td { background: var(--lvl-estado-bg); }
+.row-kind-channel .col-account { background: var(--lvl-estado-bg); color: var(--lvl-estado-fg); font-weight: 700; }
+.row-kind-channel:hover .col-account { background: var(--lvl-estado-bg); filter: brightness(0.96); }
+
+/* Propriedade */
+.row-kind-property td { background: var(--lvl-prop-bg); }
+.row-kind-property .col-account { background: var(--lvl-prop-bg); color: var(--lvl-prop-fg); font-weight: 700; }
+.row-kind-property:hover .col-account { background: var(--lvl-prop-bg); filter: brightness(0.96); }
+
+/* Centro de custo */
+.row-kind-centro td { background: var(--lvl-centro-bg); }
+.row-kind-centro .col-account { background: var(--lvl-centro-bg); color: var(--lvl-centro-fg); font-weight: 600; }
+.row-kind-centro:hover .col-account { background: var(--lvl-centro-bg); filter: brightness(0.96); }
+
+/* Campo: nível folha, fundo neutro para não competir com os acima */
+.row-kind-campo .col-account { color: var(--text); font-weight: 400; }
+.row-kind-campo:hover .col-account { background: var(--accent-weak); }
 
 .row-add {
   border: none;
@@ -334,15 +397,6 @@ thead .col-account { background: var(--surface-2); z-index: 2; }
   padding: 2px 8px;
   margin-bottom: 4px;
 }
-
-.add-form {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.add-form .text-input { flex: 1; min-width: 220px; }
-.btn-accent { background: var(--accent); border-color: var(--accent); color: #fff; }
-.btn-accent:hover { opacity: 0.9; color: #fff; }
 
 .backdrop {
   position: fixed;

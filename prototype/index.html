@@ -17,15 +17,17 @@
 
   <div class="notice">
     Protótipo rodando só neste navegador (dados salvos em <code>localStorage</code>, nada é enviado a lugar nenhum).
-    A aba <strong>Auditoria por propriedade</strong> reconstrói Canal → Propriedade → Centro de custo → Campo para
-    Bed&amp;Breakfast Manager, Bed&amp;Breakfast Leasing e Building management (linhas 272–857 da aba DRE).
-    O restante da DRE (receita, impostos, resultado) fica na aba <strong>Lista completa</strong>.
+    Escopo atual: só <strong>Bed&amp;Breakfast Manager</strong>, <strong>Bed&amp;Breakfast Leasing</strong> e
+    <strong>Building management</strong> (linhas 272–857 da aba DRE), organizados como
+    Estado → Propriedade → Centro de custo → Campo. O resto da DRE fica de fora por enquanto.
     Meses marcados com <strong>•</strong> não existiam na estrutura original da planilha — aqui já nascem prontos, sem lacunas.
   </div>
 
-  <div class="tabs">
-    <button class="tab" id="tabTree" type="button">Auditoria por propriedade</button>
-    <button class="tab" id="tabFlat" type="button">Lista completa (demais linhas da DRE)</button>
+  <div class="legend">
+    <span class="legend-item"><span class="kind-badge kind-badge-channel">Estado</span></span>
+    <span class="legend-item"><span class="kind-badge kind-badge-property">Propriedade</span></span>
+    <span class="legend-item"><span class="kind-badge kind-badge-centro">Centro de custo</span></span>
+    <span class="legend-item"><span class="legend-dot"></span> Campo auditado</span>
   </div>
 
   <div class="toolbar">
@@ -39,15 +41,13 @@
 
   <div class="summary" id="summary"></div>
 
-  <form class="add-form" id="addForm">
-    <input class="text-input" id="addInput" type="text" placeholder="Nome do novo indicador (ex.: Taxa de administração — Cond. X)">
-    <button class="btn btn-accent" type="submit">+ Adicionar indicador</button>
-  </form>
-
   <div class="table-scroll" id="treeWrap"></div>
-  <div class="table-scroll" id="flatWrap" hidden></div>
 
-  <p class="footer-note">Clique numa linha para abrir seus campos de status. Na aba de auditoria, use ▾/▸ para recolher, + para adicionar um campo num centro de custo, e × para remover.</p>
+  <p class="footer-note">
+    Clique numa linha para abrir seus campos de status. Use ▾/▸ para recolher/expandir, <strong>+</strong> em
+    qualquer linha para adicionar um item novo dentro dela (estado numa seção, propriedade num estado, centro de
+    custo numa propriedade, ou campo num centro de custo), e <strong>×</strong> para remover.
+  </p>
 </div>
 
 <div class="backdrop" id="drawerBackdrop"></div>
