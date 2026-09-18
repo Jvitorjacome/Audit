@@ -112,6 +112,7 @@ function statusTone(value) {
 // UM selo por célula, priorizando o pior caso, em vez de 5 pontos coloridos.
 function cellAggregateTone(id, monthKey) {
   const cell = getCell(id, monthKey);
+  if (cell.isHidden) return { tone: "hidden", label: "Oculto" };
   let naoConforme = 0, naoVerificado = 0;
   for (const f of STATUS_FIELDS) {
     const v = cell[f.key] || "Não verificado";
@@ -124,6 +125,7 @@ function cellAggregateTone(id, monthKey) {
 }
 function cellDetailTitle(id, monthKey) {
   const cell = getCell(id, monthKey);
+  if (cell.isHidden) return "Oculto neste mês — clique pra editar ou reexibir.";
   return STATUS_FIELDS.map((f) => `${f.label}: ${cell[f.key] || "Não verificado"}`).join(" · ");
 }
 
@@ -155,10 +157,20 @@ async function clearCell(auditFieldId, monthKey) {
   const { error } = await sb.from("audit_status").upsert(payload, { onConflict: "audit_field_id,year,month" });
   if (error) throw error;
 
-  const cell = { valorBaseTarget: "", observacoes: "" };
+  const cell = { valorBaseTarget: "", observacoes: "", isHidden: getCell(auditFieldId, monthKey).isHidden || false };
   for (const f of STATUS_FIELDS) cell[f.key] = "Não verificado";
   for (const f of OCORRENCIA_FIELDS) cell[f.key] = "";
   state.cells[cellKey(auditFieldId, monthKey)] = cell;
+}
+
+// Oculta (ou reexibe) só ESTE campo, só NESTE mês — diferente de
+// setCampoActive, que oculta o campo inteiro em todos os meses.
+async function setCellHidden(auditFieldId, monthKey, hidden) {
+  const month = MONTHS.find((m) => m.key === monthKey).number;
+  const payload = { audit_field_id: auditFieldId, year: YEAR, month, is_hidden: hidden, updated_by: currentUser.id };
+  const { error } = await sb.from("audit_status").upsert(payload, { onConflict: "audit_field_id,year,month" });
+  if (error) throw error;
+  state.cells[cellKey(auditFieldId, monthKey)] = { ...getCell(auditFieldId, monthKey), isHidden: hidden };
 }
 
 function countLeaves(node, kind) {
@@ -176,6 +188,7 @@ function aggregateAudit(node, kind, months) {
   function visitCampo(campo) {
     for (const m of months) {
       const cell = getCell(campo.id, m.key);
+      if (cell.isHidden) continue;
       for (const f of STATUS_FIELDS) {
         total++;
         const v = cell[f.key] || "Não verificado";
@@ -231,7 +244,7 @@ function buildCells(statusRows) {
   for (const row of statusRows) {
     const m = MONTH_BY_NUMBER[row.month];
     if (!m) continue;
-    const cell = { valorBaseTarget: row.valor_base_target || "", observacoes: row.observacoes || "" };
+    const cell = { valorBaseTarget: row.valor_base_target || "", observacoes: row.observacoes || "", isHidden: !!row.is_hidden };
     for (const f of STATUS_FIELDS) cell[f.key] = STATUS_DB_TO_LABEL[row[f.column]] || "Não verificado";
     for (const f of OCORRENCIA_FIELDS) cell[f.key] = row[f.column] || "";
     cells[cellKey(row.audit_field_id, m.key)] = cell;
@@ -367,18 +380,25 @@ function renderMonthFilter() {
   }
 }
 
-function monthCellsFragment(id, months) {
+function monthCellsFragment(node, months) {
   const frag = document.createDocumentFragment();
   for (const m of months) {
     const td = document.createElement("td");
     td.className = "cell-month";
-    const { tone, label } = cellAggregateTone(id, m.key);
+    const { tone, label } = cellAggregateTone(node.id, m.key);
     const badge = document.createElement("span");
     badge.className = `status-badge status-badge-${tone}`;
     badge.textContent = label;
     td.appendChild(badge);
-    td.title = cellDetailTitle(id, m.key);
+    td.title = cellDetailTitle(node.id, m.key);
     if (tone === "div") td.classList.add("cell-tone-div");
+    if (tone === "hidden") td.classList.add("cell-month-hidden");
+    // clicar numa célula de mês específico abre o painel já naquele mês
+    // (em vez de sempre abrir no primeiro mês visível da linha).
+    td.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openDrawer(node, m, KIND_LABEL.campo);
+    });
     frag.appendChild(td);
   }
   return frag;
@@ -501,7 +521,7 @@ function renderTreeTable() {
     tr.appendChild(tdName);
 
     if (kind === "campo") {
-      tr.appendChild(monthCellsFragment(node.id, months));
+      tr.appendChild(monthCellsFragment(node, months));
       tr.addEventListener("click", (e) => {
         if (e.target.closest("button")) return;
         openDrawer(node, months[0], KIND_LABEL[kind]);
@@ -588,7 +608,34 @@ function renderTreeTable() {
       });
       tdActions.appendChild(toggleBtn);
     }
-    if (kind !== "section" && parentArray && isAdmin) {
+    if (kind === "campo" && isAdmin) {
+      // Pra um campo, "×" nunca apaga o campo em si (isso levaria junto o
+      // histórico de TODOS os meses pra sempre) — limpa só os dados dos
+      // meses que estão visíveis na tela agora. Pra aposentar o campo de
+      // vez, use ocultar (🗕); pra ocultar só um mês, ocultar a célula.
+      const delBtn = document.createElement("button");
+      delBtn.type = "button";
+      delBtn.className = "row-delete";
+      delBtn.title = "Apagar os dados deste campo nos meses visíveis na tela";
+      delBtn.textContent = "×";
+      delBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const targetMonths = months;
+        if (!targetMonths.length) return;
+        const monthLabels = targetMonths.map((m) => m.label).join(", ");
+        if (!confirm(`Apagar os dados de "${node.name}" em ${monthLabels}? Isso não afeta outros meses. Essa ação não pode ser desfeita.`)) return;
+        delBtn.disabled = true;
+        try {
+          for (const m of targetMonths) await clearCell(node.id, m.key);
+          renderTreeTable();
+          renderSummary();
+        } catch (err) {
+          alert("Não foi possível apagar: " + describeError(err, "structure"));
+          delBtn.disabled = false;
+        }
+      });
+      tdActions.appendChild(delBtn);
+    } else if (kind !== "section" && parentArray && isAdmin) {
       const delBtn = document.createElement("button");
       delBtn.type = "button";
       delBtn.className = "row-delete";
@@ -636,12 +683,13 @@ function renderSummary() {
   walkTree(state.tree, "section", (node, kind) => {
     if (kind === "campo") ids.push(node.id);
   });
-  let filled = 0, div = 0;
-  const total = ids.length * months.length * STATUS_FIELDS.length;
+  let filled = 0, div = 0, total = 0;
   for (const id of ids) {
     for (const m of months) {
       const cell = getCell(id, m.key);
+      if (cell.isHidden) continue;
       for (const f of STATUS_FIELDS) {
+        total++;
         const v = cell[f.key];
         if (v) filled++;
         if (v === "Não Conforme") div++;
@@ -747,6 +795,37 @@ function openDrawer(node, month, kindLabel) {
     }
   });
   fieldsEl.appendChild(clearAllBtn);
+
+  // Oculta só este campo, só neste mês (diferente do 🗕 da linha, que oculta
+  // o campo inteiro em todos os meses) — pra quando ele não se aplica num
+  // mês específico, mas continua valendo nos outros.
+  const hideMonthLabel = document.createElement("label");
+  hideMonthLabel.className = "month-hide-toggle";
+  const hideMonthCheckbox = document.createElement("input");
+  hideMonthCheckbox.type = "checkbox";
+  hideMonthCheckbox.checked = !!cell.isHidden;
+  const hideMonthText = document.createElement("span");
+  hideMonthText.textContent = `Ocultar "${node.name}" em ${useMonth.label}`;
+  hideMonthLabel.appendChild(hideMonthCheckbox);
+  hideMonthLabel.appendChild(hideMonthText);
+  hideMonthCheckbox.addEventListener("change", async () => {
+    const hidden = hideMonthCheckbox.checked;
+    hideMonthCheckbox.disabled = true;
+    setSaving("saving");
+    try {
+      await setCellHidden(drawerCtx.id, drawerCtx.monthKey, hidden);
+      setSaving("saved");
+      renderTreeTable();
+      renderSummary();
+    } catch (err) {
+      setSaving("error");
+      hideMonthCheckbox.checked = !hidden;
+      alert("Não foi possível " + (hidden ? "ocultar" : "reexibir") + ": " + describeError(err));
+    } finally {
+      hideMonthCheckbox.disabled = false;
+    }
+  });
+  fieldsEl.appendChild(hideMonthLabel);
 
   for (const f of STATUS_FIELDS) {
     const wrap = document.createElement("label");

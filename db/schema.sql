@@ -160,6 +160,11 @@ create table audit_status (
   year int not null,
   month int not null check (month between 1 and 12),
 
+  -- oculta só ESTE campo neste mês específico (ex.: não se aplica em agosto,
+  -- mas continua valendo nos outros meses) — diferente de audit_fields.is_active,
+  -- que oculta o campo inteiro, em todos os meses.
+  is_hidden boolean not null default false,
+
   valores_banco audit_status_value not null default 'nao_verificado',
   coerencia_numerica audit_status_value not null default 'nao_verificado',
   coerencia_contabil audit_status_value not null default 'nao_verificado',

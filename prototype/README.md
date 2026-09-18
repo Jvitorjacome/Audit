@@ -84,7 +84,9 @@ Em **qualquer linha** da árvore (para quem tem papel `admin`):
 - **+** adiciona um item novo dentro dela — num Estado, adiciona uma Propriedade; numa
   Propriedade, um Centro de custo; num Centro de custo, um Campo.
 - **×** remove o item (com confirmação; se ele tiver itens dentro, o aviso mostra quantos
-  serão removidos junto — o banco também aplica isso via `on delete cascade`).
+  serão removidos junto — o banco também aplica isso via `on delete cascade`). **Exceção: num
+  campo auditado**, o **×** nunca apaga o campo em si nem seu histórico inteiro — ele só limpa
+  os dados dos **meses que estão visíveis na tela no momento** (ver "Ações por mês" abaixo).
 
 Isso cobre o caso de auditoria real: uma propriedade nova entra na empresa → adiciona o Estado
 (se ainda não existir) → adiciona a Propriedade → adiciona os Centros de custo → adiciona os
@@ -110,13 +112,37 @@ Além de adicionar/remover, cada **campo auditado** tem dois botões extras (vis
 `admin`):
 
 - **✎ (renomear)** — pede o novo nome e atualiza na hora. Útil quando o nome real do item mudou.
-- **🗕/🗗 (ocultar/mostrar)** — tira o campo da visualização padrão sem apagar nada: o histórico
-  de status continua no banco intacto, só some da lista do dia a dia. Serve pra quando algo não
-  precisa mais ser auditado, mas você não quer perder o que já foi registrado.
+  Isso é uma propriedade do campo em si, então vale pra todos os meses (não faz sentido um campo
+  ter nomes diferentes mês a mês).
+- **🗕/🗗 (ocultar/mostrar)** — tira o campo **inteiro**, **em todos os meses**, da visualização
+  padrão sem apagar nada: o histórico de status continua no banco intacto, só some da lista do
+  dia a dia. Serve pra quando algo não precisa mais ser auditado *daqui pra frente*, mas você não
+  quer perder o que já foi registrado.
 
 Campos ocultos ficam de fora por padrão. Um botão **"Mostrar campos ocultos"** na barra de
 ferramentas (só pra admin) revela todos de novo, esmaecidos e marcados com "(oculto)", pra você
 conseguir achar e reativar algum se precisar.
+
+## Ações por mês: apagar, editar e ocultar valem só pro mês, não pro campo inteiro
+
+Um campo auditado é uma linha só na árvore, mas cada mês é uma coluna com seus próprios dados —
+então apagar, editar ou ocultar **um mês** nunca deveria afetar os outros. É assim que cada ação
+funciona:
+
+- **Editar** — clicar no selo de status de um mês específico (ex.: a célula de Junho) abre o
+  painel lateral já naquele mês, não sempre no primeiro mês visível da linha. O seletor "Mês" no
+  topo do painel deixa trocar pra outro mês sem fechar e reabrir.
+- **Apagar** — o **×** no fim da linha de um campo **não apaga o campo nem seu histórico
+  inteiro**. Ele limpa (volta pra "Não verificado"/vazio) só os dados dos meses que estão
+  **visíveis na tela no momento** — filtre pros meses que quer antes de clicar, se quiser atingir
+  só um. Pra limpar um único mês específico sem depender do filtro de meses visíveis, abra o
+  painel daquele mês e use "Limpar tudo deste mês".
+- **Ocultar** — além do 🗕 que oculta o campo inteiro (todos os meses, ver seção acima), o painel
+  lateral tem um checkbox **"Ocultar [campo] em [mês]"** que oculta só aquele mês específico: a
+  célula daquele mês vira um selo tracejado "Oculto" (não conta pra % verificado, pra não
+  conformidades nem pro dashboard de Indicadores), enquanto os outros meses do mesmo campo
+  continuam normais. Serve pra quando um campo simplesmente não se aplica num mês específico
+  (ex.: uma despesa sazonal), mas volta a fazer sentido nos meses seguintes.
 
 ## Ocorrência (colunas E-H da aba "Observações")
 
@@ -153,11 +179,14 @@ pra desfazer.
 O sistema agora tem duas abas: **Auditoria** (a árvore de sempre) e **Indicadores** — um
 dashboard com KPIs e gráficos, inspirado no projeto "Audit Insights Hub" (Lovable) que o
 administrador já usava, mas lendo os dados direto deste banco (não da planilha do Google Sheets).
-Filtra por mês e propriedade, e mostra:
+Filtra por mês e propriedade — **os dois filtros afetam todos os indicadores**, inclusive
+"Total analisado" e os cards de conformidade por mês (não só os gráficos de erro): filtrar por
+uma propriedade mostra só o que foi analisado *daquela* propriedade, não o total do sistema
+inteiro. Mostra:
 
 - **Total analisado** — quantos campos tiveram pelo menos um dos 5 indicadores marcado no mês
-  (não conta célula tocada só por causa de valor/observações/ocorrência), com **% de erro** em
-  cima desse total.
+  (não conta célula tocada só por causa de valor/observações/ocorrência, nem mês oculto — ver
+  "Ações por mês" acima), com **% de erro** em cima desse total.
 - **Não conformidades** e **taxa de conformidade**.
 - **Impacto financeiro (não corrigido)** — soma do valor dos campos não conformes com
   "Corrigido = Não".

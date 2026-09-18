@@ -19,6 +19,14 @@ projeto Supabase de produção da QAVI** ("Auditoria - Qavi", projeto
   contém o resultado de todas elas — só use a pasta `migrations/` se estiver
   aplicando em um projeto que já rodava uma versão anterior do schema.
 
+### `migrations/006_per_month_hide_and_scoped_actions.sql`
+
+Já aplicada. Adiciona `audit_status.is_hidden`, pra dar suporte a ocultar um campo auditado só
+num mês específico (diferente de `audit_fields.is_active`, que oculta o campo inteiro em todos os
+meses). As outras duas mudanças dessa rodada — o **×** de apagar um campo passar a limpar só os
+meses visíveis na tela (nunca mais o campo inteiro pra sempre) e clicar numa célula de mês
+específico abrir o painel já naquele mês — são só frontend, não mexem no banco.
+
 ### `migrations/005_sections_created_by_and_data_cleanup.sql`
 
 Já aplicada. Duas coisas: (1) adiciona `created_by` em `sections`, pra ficar igual

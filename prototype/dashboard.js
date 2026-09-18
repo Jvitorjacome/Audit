@@ -60,16 +60,21 @@ function collectDashboardRows() {
   }
 
   const rows = [];
+  // por mês: total geral + contagem por propriedade, pra "Total analisado" (e o
+  // "analisados" de cada card de mês) respeitarem o filtro de propriedade também.
   const analyzedByMonth = {};
   for (const campoId of activeCampoIds) {
     for (const m of MONTHS) {
       const raw = state.cells[cellKey(campoId, m.key)];
-      if (!raw) continue;
+      if (!raw || raw.isHidden) continue;
       // "analisado" = pelo menos um dos 5 indicadores foi de fato marcado
       // (não conta uma célula tocada só pra preencher valor/observações/ocorrência).
       const wasAssessed = STATUS_FIELDS.some((f) => raw[f.key] && raw[f.key] !== "Não verificado");
       if (!wasAssessed) continue;
-      analyzedByMonth[m.key] = (analyzedByMonth[m.key] || 0) + 1;
+      const propriedade = propertyByCampoId[campoId] || "—";
+      const bucket = (analyzedByMonth[m.key] ||= { total: 0, byProp: {} });
+      bucket.total += 1;
+      bucket.byProp[propriedade] = (bucket.byProp[propriedade] || 0) + 1;
       const hasNaoConforme = STATUS_FIELDS.some((f) => raw[f.key] === "Não Conforme");
       if (!hasNaoConforme) continue;
       rows.push({
