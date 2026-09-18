@@ -91,6 +91,19 @@ Isso cobre o caso de auditoria real: uma propriedade nova entra na empresa → a
 Campos. Tudo fica salvo no banco imediatamente e já aparece para qualquer outro auditor que
 atualizar a página (ou clicar em "Atualizar dados").
 
+### Painel "+ Adicionar item" (criação explícita, qualquer nível)
+
+Além dos botões **+** contextuais de cada linha (que exigem descobrir qual linha cria o quê),
+a barra de ferramentas tem um botão **"+ Adicionar item"** (só pra `admin`) que abre um painel
+onde você escolhe **explicitamente o tipo** do que vai criar — Seção, Estado, Propriedade,
+Centro de custo ou Campo auditado — e depois escolhe cada nível pai em cascata (ex.: pra criar
+uma Propriedade, escolhe primeiro a Seção, depois o Estado dentro dela; pra criar um Campo,
+escolhe Seção → Estado → Propriedade → Centro de custo). É o único jeito de criar uma **Seção**
+nova — as linhas da árvore não têm **+** pra isso, porque Seção é o topo da hierarquia e não
+tem um "pai" pra clicar. Se a lista de um nível pai estiver vazia (ex.: nenhum Centro de custo
+ainda na Propriedade escolhida), o painel avisa e pede pra criar esse nível primeiro. Qualquer
+item criado por aqui é gravado no banco na hora, do mesmo jeito que os botões **+** de linha.
+
 ## Ocultar e renomear campos (admin)
 
 Além de adicionar/remover, cada **campo auditado** tem dois botões extras (visíveis só pra

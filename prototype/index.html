@@ -64,6 +64,7 @@
         <button class="btn" id="btnOriginalMonths" type="button">Só meses da planilha original</button>
         <button class="btn" id="btnAllMonths" type="button">Mostrar ano inteiro</button>
         <button class="btn" id="btnToggleHidden" type="button" hidden>Mostrar campos ocultos</button>
+        <button class="btn" id="btnCreateItem" type="button" hidden>+ Adicionar item</button>
         <button class="btn" id="btnRefresh" type="button">Atualizar dados</button>
       </div>
     </div>
@@ -118,6 +119,40 @@
     <span class="field-label">Observações</span>
     <textarea class="textarea" id="drawerObservacoes" rows="4" placeholder="Notas livres do auditor..."></textarea>
   </label>
+</aside>
+
+<div class="backdrop" id="createBackdrop"></div>
+<aside class="drawer" id="createPanel">
+  <div class="drawer-header">
+    <div>
+      <span class="drawer-kind">Novo item</span>
+      <h2>Adicionar à hierarquia</h2>
+      <p>Escolha o tipo, onde ele entra, e o nome.</p>
+    </div>
+    <button class="drawer-close" id="createClose" type="button" aria-label="Fechar">✕</button>
+  </div>
+
+  <label class="field">
+    <span class="field-label">Tipo</span>
+    <select class="select" id="createKind">
+      <option value="section">Seção</option>
+      <option value="channel">Estado</option>
+      <option value="property" selected>Propriedade</option>
+      <option value="centro">Centro de custo</option>
+      <option value="campo">Campo auditado</option>
+    </select>
+  </label>
+
+  <div id="createParents" style="display:flex; flex-direction:column; gap:14px;"></div>
+
+  <label class="field">
+    <span class="field-label">Nome</span>
+    <input class="text-input" id="createName" type="text" placeholder="Nome do novo item">
+  </label>
+
+  <p class="auth-error" id="createError" hidden></p>
+
+  <button class="btn btn-primary" id="createSubmit" type="button">Criar</button>
 </aside>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

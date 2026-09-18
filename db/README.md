@@ -19,12 +19,24 @@ projeto Supabase de produção da QAVI** ("Auditoria - Qavi", projeto
   contém o resultado de todas elas — só use a pasta `migrations/` se estiver
   aplicando em um projeto que já rodava uma versão anterior do schema.
 
-### ⚠️ Pendente: `migrations/004_ocorrencia_options_table.sql`
+### `migrations/005_sections_created_by_and_data_cleanup.sql`
 
-Ainda não foi aplicada. Cria a tabela `ocorrencia_options`, que torna as listas de
+Já aplicada. Duas coisas: (1) adiciona `created_by` em `sections`, pra ficar igual
+às outras 4 tabelas da hierarquia — necessária porque agora dá pra criar Seção pela
+interface (painel "+ Adicionar item", ver `prototype/README.md`); (2) registra a
+limpeza de dados que corrigiu a "Limitação herdada do protótipo" descrita mais
+abaixo: um campo mal promovido a propriedade ("1. Salário limpeza - José Aldo") e
+14 propriedades + 13 estados bogus na cauda de "Building management" (a partir da
+linha ~552 da planilha, que listava regiões/contas bancárias, não propriedades reais)
+— confirmados item a item pelo administrador antes de remover. Contagem final: 12
+propriedades reais (ver lista no arquivo da migração).
+
+### `migrations/004_ocorrencia_options_table.sql`
+
+Já aplicada. Cria a tabela `ocorrencia_options`, que torna as listas de
 "Ocorrências por tipo", "Setor responsável" e "Funcionário responsável" editáveis
 por um admin direto no app (botão "+ Adicionar novo..." no dropdown), em vez de
-fixas no código. Sem essa migração, esses 3 dropdowns aparecem vazios.
+fixas no código.
 
 ### `migrations/003_fix_audit_history_trigger_rls.sql`
 
@@ -42,16 +54,17 @@ funcionário responsáveis).
 ## Status atual: já aplicado em produção
 
 `schema.sql` e `seed.sql` já foram aplicados diretamente no projeto Supabase real
-via MCP. Contagens conferidas em produção (batem exatamente com a validação local):
+via MCP. Contagens atuais em produção, já depois de `005_sections_created_by_and_data_cleanup.sql`
+(números originais do import eram maiores — ver "Limitação herdada do protótipo" abaixo):
 
 | Tabela | Linhas |
 |---|---|
 | sections | 3 |
-| states | 20 |
-| properties | 27 |
-| cost_centers | 96 |
-| audit_fields | 441 |
-| audit_status | 1074 |
+| states | 6 |
+| properties | 12 |
+| cost_centers | 74 |
+| audit_fields | 180 |
+| audit_status | 1080 |
 
 Rodei também o linter de segurança do Supabase (`get_advisors`) depois de aplicar
 tudo. Corrigi os dois achados que eram meus: a view `v_audit_overview` estava
@@ -102,16 +115,17 @@ Supabase de verdade já vêm prontos), rodei `seed.sql` e conferi:
 Ou seja: o schema não é só teórico, já rodou de verdade com os dados reais antes de
 chegar até você.
 
-## Limitação herdada do protótipo
+## Limitação herdada do protótipo (já corrigida)
 
-O parser que reconstruiu Propriedade/Centro de custo a partir da planilha original tem
+O parser que reconstruiu Propriedade/Centro de custo a partir da planilha original tinha
 uma taxa de acerto boa mas não perfeita a partir de um certo ponto de "Building
 management" (por volta da linha 550) — ali a estrutura da planilha muda de padrão
-(passa a listar regiões e contas bancárias). Um item malclassificado real: a linha 534
-("1. Salário limpeza - José Aldo") entrou como se fosse uma Propriedade, quando
-provavelmente é um campo. Vale uma revisão manual dessa faixa antes de considerar os
-dados 100% confiáveis — é rápido de corrigir com `UPDATE`s diretos no banco depois de
-identificar os casos errados.
+(passa a listar regiões e contas bancárias). Isso gerou 14 "propriedades" bogus (com até
+125 campos cada) e 13 "estados" vazios, além de um campo real malclassificado como
+propriedade ("1. Salário limpeza - José Aldo", linha 534). Confirmado pelo administrador
+(dono do processo de auditoria, que sabe de cor as 12 propriedades reais) e corrigido via
+`migrations/005_sections_created_by_and_data_cleanup.sql` — ver esse arquivo pro SQL
+exato e a lista das 12 propriedades reais.
 
 ## Frontend já conectado
 

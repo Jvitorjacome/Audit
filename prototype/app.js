@@ -42,6 +42,7 @@ const KIND_ADD_LABEL = { section: "Estado", channel: "Propriedade", property: "C
 
 function makeNode(kind, name, id, row = null) {
   const base = { id, name, row };
+  if (kind === "section") return { ...base, channels: [] };
   if (kind === "channel") return { ...base, properties: [] };
   if (kind === "property") return { ...base, centros: [] };
   if (kind === "centro") return { ...base, campos: [] };
@@ -300,10 +301,17 @@ async function addOcorrenciaOption(fieldKey, value) {
 }
 
 async function addNode(kind, parentId, siblingCount, rawName) {
-  const cfg = HIERARCHY[kind];
   const finalName = kind === "channel" ? rawName.trim().toUpperCase() : rawName.trim();
-  const payload = { name: finalName, sort_order: siblingCount, created_by: currentUser.id, [cfg.parentColumn]: parentId };
-  const { data, error } = await sb.from(cfg.table).insert(payload).select().single();
+  const payload = { name: finalName, sort_order: siblingCount, created_by: currentUser.id };
+  let table;
+  if (kind === "section") {
+    table = "sections"; // seção não tem coluna de pai — é o topo da hierarquia
+  } else {
+    const cfg = HIERARCHY[kind];
+    table = cfg.table;
+    payload[cfg.parentColumn] = parentId;
+  }
+  const { data, error } = await sb.from(table).insert(payload).select().single();
   if (error) throw error;
   return makeNode(kind, data.name, data.id, data.source_row);
 }
@@ -906,7 +914,10 @@ function closeDrawer() {
 document.getElementById("drawerClose").addEventListener("click", closeDrawer);
 drawerBackdrop.addEventListener("click", closeDrawer);
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") closeDrawer();
+  if (e.key === "Escape") {
+    closeDrawer();
+    closeCreatePanel();
+  }
 });
 
 // ---------- toolbar ----------
@@ -939,6 +950,156 @@ document.getElementById("btnToggleHidden").addEventListener("click", () => {
   renderAuthBar();
 });
 
+// ---------- painel "adicionar item" (admin: cria qualquer nível da hierarquia,
+// escolhendo explicitamente o tipo e cada nível pai em cascata) ----------
+
+const createBackdrop = document.getElementById("createBackdrop");
+const createPanel = document.getElementById("createPanel");
+const createKindEl = document.getElementById("createKind");
+const createParentsEl = document.getElementById("createParents");
+const createNameEl = document.getElementById("createName");
+const createErrorEl = document.getElementById("createError");
+const createSubmitBtn = document.getElementById("createSubmit");
+
+// kind -> cadeia de níveis pai que precisam ser escolhidos em cascata antes dele
+const CREATE_PARENT_CHAIN = {
+  section: [],
+  channel: ["section"],
+  property: ["section", "channel"],
+  centro: ["section", "channel", "property"],
+  campo: ["section", "channel", "property", "centro"],
+};
+
+let createParentSelects = [];
+
+function createNodesAtLevel(levelIndex, chain) {
+  let nodes = state.tree;
+  for (let i = 0; i < levelIndex; i++) {
+    const levelKind = chain[i];
+    const sel = createParentSelects[i];
+    const node = nodes.find((n) => n.id === (sel && sel.value)) || nodes[0];
+    nodes = node ? childrenOf(node, levelKind) || [] : [];
+  }
+  return nodes;
+}
+
+function buildCreateParentSelect(levelIndex, chain) {
+  const levelKind = chain[levelIndex];
+  const nodes = createNodesAtLevel(levelIndex, chain);
+  const wrapper = document.createElement("label");
+  wrapper.className = "field";
+  const labelSpan = document.createElement("span");
+  labelSpan.className = "field-label";
+  labelSpan.textContent = KIND_LABEL[levelKind];
+  const select = document.createElement("select");
+  select.className = "select";
+  for (const node of nodes) {
+    const opt = document.createElement("option");
+    opt.value = node.id;
+    opt.textContent = node.name;
+    select.appendChild(opt);
+  }
+  if (!nodes.length) {
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.textContent = `nenhum(a) ${KIND_LABEL[levelKind].toLowerCase()} cadastrado(a) ainda`;
+    select.appendChild(opt);
+  }
+  wrapper.appendChild(labelSpan);
+  wrapper.appendChild(select);
+  select.addEventListener("change", () => rebuildCreateParentsFrom(levelIndex + 1, chain));
+  return { wrapper, select };
+}
+
+function rebuildCreateParentsFrom(startIndex, chain) {
+  createParentSelects.length = startIndex;
+  while (createParentsEl.children.length > startIndex) {
+    createParentsEl.removeChild(createParentsEl.lastChild);
+  }
+  for (let i = startIndex; i < chain.length; i++) {
+    const { wrapper, select } = buildCreateParentSelect(i, chain);
+    createParentsEl.appendChild(wrapper);
+    createParentSelects[i] = select;
+  }
+}
+
+function renderCreateParents() {
+  createParentsEl.innerHTML = "";
+  createParentSelects = [];
+  rebuildCreateParentsFrom(0, CREATE_PARENT_CHAIN[createKindEl.value] || []);
+}
+
+function openCreatePanel() {
+  createNameEl.value = "";
+  createErrorEl.hidden = true;
+  renderCreateParents();
+  createPanel.classList.add("drawer-open");
+  createBackdrop.classList.add("backdrop-visible");
+}
+function closeCreatePanel() {
+  createPanel.classList.remove("drawer-open");
+  createBackdrop.classList.remove("backdrop-visible");
+}
+
+async function handleCreateSubmit() {
+  const kind = createKindEl.value;
+  const name = createNameEl.value.trim();
+  createErrorEl.hidden = true;
+  if (!name) {
+    createErrorEl.textContent = "Digite um nome.";
+    createErrorEl.hidden = false;
+    return;
+  }
+
+  const chain = CREATE_PARENT_CHAIN[kind] || [];
+  let parentNode = null;
+  let parentArray = state.tree;
+  let parentId = null;
+
+  if (chain.length) {
+    for (let i = 0; i < chain.length; i++) {
+      if (!createParentSelects[i] || !createParentSelects[i].value) {
+        createErrorEl.textContent = `Escolha ${KIND_LABEL[chain[i]].toLowerCase()} antes de continuar (crie um primeiro se a lista estiver vazia).`;
+        createErrorEl.hidden = false;
+        return;
+      }
+    }
+    const lastLevelKind = chain[chain.length - 1];
+    const lastSelId = createParentSelects[chain.length - 1].value;
+    const candidates = createNodesAtLevel(chain.length - 1, chain);
+    parentNode = candidates.find((n) => n.id === lastSelId);
+    if (!parentNode) {
+      createErrorEl.textContent = "Não foi possível identificar o item pai escolhido. Feche e tente de novo.";
+      createErrorEl.hidden = false;
+      return;
+    }
+    parentId = parentNode.id;
+    parentArray = childrenOf(parentNode, lastLevelKind);
+  }
+
+  createSubmitBtn.disabled = true;
+  try {
+    const child = await addNode(kind, parentId, parentArray.length, name);
+    parentArray.push(child);
+    if (parentNode) state.collapsed[parentNode.id] = false;
+    saveViewPrefs();
+    renderTreeTable();
+    renderSummary();
+    closeCreatePanel();
+  } catch (err) {
+    createErrorEl.textContent = "Não foi possível criar: " + describeError(err, "structure");
+    createErrorEl.hidden = false;
+  } finally {
+    createSubmitBtn.disabled = false;
+  }
+}
+
+document.getElementById("btnCreateItem").addEventListener("click", openCreatePanel);
+document.getElementById("createClose").addEventListener("click", closeCreatePanel);
+createBackdrop.addEventListener("click", closeCreatePanel);
+createKindEl.addEventListener("change", renderCreateParents);
+createSubmitBtn.addEventListener("click", handleCreateSubmit);
+
 // ---------- autenticação ----------
 
 function showAuthScreen() {
@@ -970,6 +1131,8 @@ function renderAuthBar() {
   const toggleHiddenBtn = document.getElementById("btnToggleHidden");
   toggleHiddenBtn.hidden = !isAdmin;
   toggleHiddenBtn.textContent = state.showHidden ? "Esconder campos ocultos" : "Mostrar campos ocultos";
+
+  document.getElementById("btnCreateItem").hidden = !isAdmin;
 }
 
 async function onSignedIn(session) {

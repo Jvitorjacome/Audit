@@ -50,7 +50,8 @@ create table sections (
   name text not null,
   sort_order int not null default 0,
   source_row int,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  created_by uuid references profiles(id)
 );
 
 create table states (
