@@ -51,3 +51,45 @@ const HIERARCHY = {
   centro: { table: "cost_centers", parentColumn: "property_id" },
   campo: { table: "audit_fields", parentColumn: "cost_center_id" },
 };
+
+// Rastreio de ocorrência (colunas E-H da aba "Observações" da planilha
+// "Setor Auditoria"). Aparecem em cascata no painel: cada campo só é
+// mostrado depois que o anterior da lista tem um valor marcado.
+const OCORRENCIA_FIELDS = [
+  {
+    key: "ocorrenciaTipo",
+    label: "Ocorrências por tipo",
+    column: "ocorrencia_tipo",
+    options: [
+      "Centro de custo",
+      "Competência",
+      "Competência Errada",
+      "Débito duplicado",
+      "Descrição",
+      "Não lançado",
+      "Pontuação Inválida",
+      "Propriedade",
+      "Valor",
+      "Sem código",
+      "Não pago",
+      "Não lançado e nem Pago",
+      "Pagamento duplicado",
+      "Valor menor que o target",
+      "Valor maior que o target",
+      "Pago, mas não lançado",
+    ],
+  },
+  { key: "corrigido", label: "Corrigido?", column: "corrigido", options: ["Sim", "Não"] },
+  {
+    key: "setorResponsavel",
+    label: "Setor responsável",
+    column: "setor_responsavel",
+    options: ["Compras", "Diretoria, Financeiro", "Financeiro", "Host", "RH"],
+  },
+  {
+    key: "funcionarioResponsavel",
+    label: "Funcionário responsável",
+    column: "funcionario_responsavel",
+    options: ["Cinthia Melo", "Gabriel", "João Victor Raimundo", "Rafaela Silva", "Sergio Roberto", "João Jácome", "Ernandes"],
+  },
+];

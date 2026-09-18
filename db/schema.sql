@@ -89,6 +89,7 @@ create table audit_fields (
   name text not null, -- ex.: "0. Salário - João Pedro"
   sort_order int not null default 0,
   source_row int,
+  is_active boolean not null default true, -- oculta o campo sem apagar o histórico de status
   created_at timestamptz not null default now(),
   created_by uuid references profiles(id)
 );
@@ -120,6 +121,15 @@ create table audit_status (
 
   valor_base_target text, -- mantido como texto: a planilha original mistura número e texto livre aqui
   observacoes text,
+
+  -- Rastreio de ocorrência (colunas E-H da aba "Observações" da planilha
+  -- "Setor Auditoria"). Tudo opcional: só se preenche quando há de fato uma
+  -- ocorrência a registrar, em cascata (tipo -> corrigido -> setor -> pessoa).
+  ocorrencia_tipo text,
+  corrigido text check (corrigido in ('Sim', 'Não')),
+  setor_responsavel text,
+  funcionario_responsavel text,
+
   extra jsonb not null default '{}'::jsonb,
 
   updated_by uuid references profiles(id),
@@ -161,7 +171,8 @@ begin
   end if;
   return new;
 end;
-$$ language plpgsql;
+$$ language plpgsql
+set search_path = public, pg_temp; -- linter de segurança: search_path fixo
 
 create trigger trg_audit_status_history
   after update on audit_status
@@ -179,11 +190,12 @@ select
   st.id as state_id, st.name as state_name,
   p.id as property_id, p.name as property_name,
   cc.id as cost_center_id, cc.name as cost_center_name,
-  af.id as audit_field_id, af.name as audit_field_name,
+  af.id as audit_field_id, af.name as audit_field_name, af.is_active as audit_field_is_active,
   ast.year, ast.month,
   ast.valores_banco, ast.coerencia_numerica, ast.coerencia_contabil,
   ast.composicao_debito, ast.coerencia_patrimonial,
   ast.valor_base_target, ast.observacoes,
+  ast.ocorrencia_tipo, ast.corrigido, ast.setor_responsavel, ast.funcionario_responsavel,
   (
     (ast.valores_banco = 'nao_conforme') or
     (ast.coerencia_numerica = 'nao_conforme') or
@@ -197,6 +209,10 @@ join properties p on p.state_id = st.id
 join cost_centers cc on cc.property_id = p.id
 join audit_fields af on af.cost_center_id = cc.id
 left join audit_status ast on ast.audit_field_id = af.id;
+
+-- security_invoker: a view respeita o RLS de quem consulta, não de quem criou
+-- (achado do linter de segurança do Supabase — corrigido também em produção)
+alter view v_audit_overview set (security_invoker = true);
 
 -- ============================================================================
 -- Row Level Security — ponto de partida simples: qualquer usuário autenticado

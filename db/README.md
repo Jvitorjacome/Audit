@@ -7,11 +7,25 @@ projeto Supabase de produção da QAVI** ("Auditoria - Qavi", projeto
 
 ## Arquivos
 
-- **`schema.sql`** — a estrutura: tabelas, tipos, índices, a view de dashboard, o
-  gatilho de trilha de auditoria e as políticas de RLS (Row Level Security).
+- **`schema.sql`** — a estrutura completa e atual: tabelas, tipos, índices, a view
+  de dashboard, o gatilho de trilha de auditoria e as políticas de RLS (Row Level
+  Security). Reflete o estado mais recente do banco (já incorpora as migrações
+  abaixo) — use este arquivo pra um projeto novo do zero.
 - **`seed.sql`** — os dados reais já extraídos da aba DRE (as mesmas ~441 linhas
   auditáveis que estão no protótipo), gerado automaticamente a partir de
   `prototype/data.js`. Aplique depois do `schema.sql` pra não começar do zero.
+- **`migrations/`** — mudanças incrementais aplicadas ao banco de produção depois
+  do `schema.sql` inicial, uma por arquivo, em ordem numérica. `schema.sql` já
+  contém o resultado de todas elas — só use a pasta `migrations/` se estiver
+  aplicando em um projeto que já rodava uma versão anterior do schema.
+
+### ⚠️ Pendente: `migrations/002_hide_fields_and_ocorrencia_tracking.sql`
+
+Ainda não foi aplicada no banco de produção (o conector do Supabase estava fora
+do ar quando essa mudança foi feita). **Precisa colar o conteúdo desse arquivo no
+SQL Editor do painel Supabase e rodar** antes do app conseguir usar ocultar/mostrar
+campo, renomear campo, e os 4 novos campos de ocorrência (tipo, corrigido, setor e
+funcionário responsáveis). Sem isso, essas ações vão dar erro de coluna inexistente.
 
 ## Status atual: já aplicado em produção
 

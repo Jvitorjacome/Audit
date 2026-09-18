@@ -41,7 +41,7 @@ function makeNode(kind, name, id, row = null) {
   if (kind === "channel") return { ...base, properties: [] };
   if (kind === "property") return { ...base, centros: [] };
   if (kind === "centro") return { ...base, campos: [] };
-  return base; // campo: leaf
+  return { ...base, isActive: true }; // campo: leaf
 }
 
 function walkTree(nodes, kind, visit) {
@@ -66,7 +66,10 @@ function loadViewPrefs() {
 }
 function saveViewPrefs() {
   try {
-    localStorage.setItem(VIEW_PREFS_KEY, JSON.stringify({ visibleMonths: state.visibleMonths, collapsed: state.collapsed }));
+    localStorage.setItem(
+      VIEW_PREFS_KEY,
+      JSON.stringify({ visibleMonths: state.visibleMonths, collapsed: state.collapsed, showHidden: state.showHidden })
+    );
   } catch (e) {
     /* private window / storage blocked - só afeta preferência de tela */
   }
@@ -78,6 +81,7 @@ let state = {
   cells: {},
   visibleMonths: (savedPrefs && savedPrefs.visibleMonths) || MONTHS.filter((m) => m.inOriginal).map((m) => m.key),
   collapsed: (savedPrefs && savedPrefs.collapsed) || {},
+  showHidden: (savedPrefs && savedPrefs.showHidden) || false,
 };
 
 let currentUser = null;
@@ -121,7 +125,9 @@ async function persistCellField(auditFieldId, monthKey, uiFieldKey, uiValue) {
   const month = MONTHS.find((m) => m.key === monthKey).number;
   const payload = { audit_field_id: auditFieldId, year: YEAR, month, updated_by: currentUser.id };
   const statusField = STATUS_FIELDS.find((f) => f.key === uiFieldKey);
+  const ocorrenciaField = OCORRENCIA_FIELDS.find((f) => f.key === uiFieldKey);
   if (statusField) payload[statusField.column] = STATUS_LABEL_TO_DB[uiValue];
+  else if (ocorrenciaField) payload[ocorrenciaField.column] = uiValue || null;
   else if (uiFieldKey === "valorBaseTarget") payload.valor_base_target = uiValue;
   else if (uiFieldKey === "observacoes") payload.observacoes = uiValue;
 
@@ -172,7 +178,7 @@ function countDescendantNodes(node, kind) {
 
 // ---------- Supabase: carregar árvore + status ----------
 
-function buildTree(sections, states, properties, costCenters, auditFields) {
+function buildTree(sections, states, properties, costCenters, auditFields, showHidden) {
   const statesBySection = groupBy(states, "section_id");
   const propertiesByState = groupBy(properties, "state_id");
   const costCentersByProperty = groupBy(costCenters, "property_id");
@@ -186,9 +192,11 @@ function buildTree(sections, states, properties, costCenters, auditFields) {
         id: p.id, name: p.name, row: p.source_row,
         centros: (costCentersByProperty[p.id] || []).map((cc) => ({
           id: cc.id, name: cc.name, row: cc.source_row,
-          campos: (auditFieldsByCostCenter[cc.id] || []).map((af) => ({
-            id: af.id, name: af.name, row: af.source_row,
-          })),
+          campos: (auditFieldsByCostCenter[cc.id] || [])
+            .filter((af) => showHidden || af.is_active !== false)
+            .map((af) => ({
+              id: af.id, name: af.name, row: af.source_row, isActive: af.is_active !== false,
+            })),
         })),
       })),
     })),
@@ -202,9 +210,20 @@ function buildCells(statusRows) {
     if (!m) continue;
     const cell = { valorBaseTarget: row.valor_base_target || "", observacoes: row.observacoes || "" };
     for (const f of STATUS_FIELDS) cell[f.key] = STATUS_DB_TO_LABEL[row[f.column]] || "Não verificado";
+    for (const f of OCORRENCIA_FIELDS) cell[f.key] = row[f.column] || "";
     cells[cellKey(row.audit_field_id, m.key)] = cell;
   }
   return cells;
+}
+
+let rawHierarchy = null; // cache cru da última carga, pra reconstruir a árvore sem rede ao alternar "mostrar ocultos"
+
+function rebuildTreeFromCache() {
+  if (!rawHierarchy) return;
+  state.tree = buildTree(
+    rawHierarchy.sections, rawHierarchy.states, rawHierarchy.properties,
+    rawHierarchy.costCenters, rawHierarchy.auditFields, state.showHidden
+  );
 }
 
 async function loadAll() {
@@ -217,7 +236,11 @@ async function loadAll() {
   ]);
   for (const r of [sections, states, properties, costCenters, auditFields]) if (r.error) throw r.error;
 
-  state.tree = buildTree(sections.data, states.data, properties.data, costCenters.data, auditFields.data);
+  rawHierarchy = {
+    sections: sections.data, states: states.data, properties: properties.data,
+    costCenters: costCenters.data, auditFields: auditFields.data,
+  };
+  rebuildTreeFromCache();
 
   const statusRes = await sb.from("audit_status").select("*").eq("year", YEAR);
   if (statusRes.error) throw statusRes.error;
@@ -231,6 +254,16 @@ async function addNode(kind, parentId, siblingCount, rawName) {
   const { data, error } = await sb.from(cfg.table).insert(payload).select().single();
   if (error) throw error;
   return makeNode(kind, data.name, data.id, data.source_row);
+}
+
+async function renameCampo(id, newName) {
+  const { error } = await sb.from("audit_fields").update({ name: newName }).eq("id", id);
+  if (error) throw error;
+}
+
+async function setCampoActive(id, isActive) {
+  const { error } = await sb.from("audit_fields").update({ is_active: isActive }).eq("id", id);
+  if (error) throw error;
 }
 
 async function deleteNode(kind, id) {
@@ -355,7 +388,7 @@ function renderTreeTable() {
     const collapsed = !!state.collapsed[node.id];
 
     const tr = document.createElement("tr");
-    tr.className = `row-tree row-depth-${Math.min(depth, 5)} row-kind-${kind}`;
+    tr.className = `row-tree row-depth-${Math.min(depth, 5)} row-kind-${kind}` + (node.isActive === false ? " row-inactive" : "");
     const tdName = document.createElement("td");
     tdName.className = "col-account";
     tdName.style.paddingLeft = `${10 + depth * 20}px`;
@@ -391,6 +424,13 @@ function renderTreeTable() {
     nameSpan.textContent = node.name || "(sem nome)";
     nameSpan.title = `${KIND_LABEL[kind]}${node.row ? " · linha " + node.row + " na planilha original" : " · adicionado neste sistema"}`;
     tdName.appendChild(nameSpan);
+
+    if (kind === "campo" && node.isActive === false) {
+      const hiddenBadge = document.createElement("span");
+      hiddenBadge.className = "node-count";
+      hiddenBadge.textContent = " (oculto)";
+      tdName.appendChild(hiddenBadge);
+    }
 
     if (hasKids) {
       const count = document.createElement("span");
@@ -438,6 +478,55 @@ function renderTreeTable() {
         }
       });
       tdActions.appendChild(addBtn);
+    }
+    if (kind === "campo" && isAdmin) {
+      const renameBtn = document.createElement("button");
+      renameBtn.type = "button";
+      renameBtn.className = "row-rename";
+      renameBtn.title = "Renomear campo";
+      renameBtn.textContent = "✎";
+      renameBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const newName = prompt("Novo nome do campo:", node.name);
+        if (!newName || !newName.trim() || newName.trim() === node.name) return;
+        renameBtn.disabled = true;
+        try {
+          await renameCampo(node.id, newName.trim());
+          node.name = newName.trim();
+          renderTreeTable();
+        } catch (err) {
+          alert("Não foi possível renomear: " + describeError(err));
+        } finally {
+          renameBtn.disabled = false;
+        }
+      });
+      tdActions.appendChild(renameBtn);
+
+      const toggleBtn = document.createElement("button");
+      toggleBtn.type = "button";
+      toggleBtn.className = "row-toggle-active";
+      const wasActive = node.isActive !== false;
+      toggleBtn.title = wasActive ? "Ocultar campo (não precisa mais auditar)" : "Mostrar campo de novo";
+      toggleBtn.textContent = wasActive ? "🗕" : "🗗";
+      toggleBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        toggleBtn.disabled = true;
+        try {
+          await setCampoActive(node.id, !wasActive);
+          node.isActive = !wasActive;
+          if (!state.showHidden && wasActive) {
+            const idx = parentArray.indexOf(node);
+            if (idx >= 0) parentArray.splice(idx, 1);
+          }
+          renderTreeTable();
+          renderSummary();
+        } catch (err) {
+          alert("Não foi possível " + (wasActive ? "ocultar" : "mostrar") + " o campo: " + describeError(err));
+        } finally {
+          toggleBtn.disabled = false;
+        }
+      });
+      tdActions.appendChild(toggleBtn);
     }
     if (kind !== "section" && parentArray && isAdmin) {
       const delBtn = document.createElement("button");
@@ -607,6 +696,50 @@ function openDrawer(node, month, kindLabel) {
     fieldsEl.appendChild(wrap);
   }
 
+  // Ocorrência: aparece em cascata — cada campo só é oferecido depois que o
+  // anterior já tem um valor marcado, pra não poluir o painel à toa.
+  const ocorrenciaHeading = document.createElement("div");
+  ocorrenciaHeading.className = "field-group-label";
+  ocorrenciaHeading.textContent = "Ocorrência (opcional)";
+  fieldsEl.appendChild(ocorrenciaHeading);
+
+  for (const f of OCORRENCIA_FIELDS) {
+    const priorField = OCORRENCIA_FIELDS[OCORRENCIA_FIELDS.indexOf(f) - 1];
+    if (priorField && !cell[priorField.key]) break;
+
+    const wrap = document.createElement("label");
+    wrap.className = "field";
+    const value = cell[f.key] || "";
+    wrap.innerHTML = `<span class="field-label">${f.label}</span>`;
+    const select = document.createElement("select");
+    select.className = "select";
+    const blankOpt = document.createElement("option");
+    blankOpt.value = "";
+    blankOpt.textContent = "— selecionar —";
+    if (!value) blankOpt.selected = true;
+    select.appendChild(blankOpt);
+    for (const opt of f.options) {
+      const o = document.createElement("option");
+      o.value = opt;
+      o.textContent = opt;
+      if (opt === value) o.selected = true;
+      select.appendChild(o);
+    }
+    select.addEventListener("change", async () => {
+      setSaving("saving");
+      try {
+        await persistCellField(drawerCtx.id, drawerCtx.monthKey, f.key, select.value);
+        setSaving("saved");
+        openDrawer(node, useMonth, kindLabel);
+      } catch (err) {
+        setSaving("error");
+        alert("Não foi possível salvar: " + describeError(err));
+      }
+    });
+    wrap.appendChild(select);
+    fieldsEl.appendChild(wrap);
+  }
+
   const valorInput = document.getElementById("drawerValor");
   valorInput.value = cell.valorBaseTarget || "";
   valorInput.oninput = () => persistValor(drawerCtx.id, drawerCtx.monthKey, valorInput.value);
@@ -653,6 +786,13 @@ document.getElementById("btnRefresh").addEventListener("click", async () => {
     showLoadError(err);
   }
 });
+document.getElementById("btnToggleHidden").addEventListener("click", () => {
+  state.showHidden = !state.showHidden;
+  saveViewPrefs();
+  rebuildTreeFromCache();
+  render();
+  renderAuthBar();
+});
 
 // ---------- autenticação ----------
 
@@ -681,6 +821,10 @@ function renderAuthBar() {
   const roleBadge = document.getElementById("authRoleBadge");
   roleBadge.textContent = isAdmin ? "Administrador" : "Auditor";
   roleBadge.className = "role-badge" + (isAdmin ? " role-badge-admin" : "");
+
+  const toggleHiddenBtn = document.getElementById("btnToggleHidden");
+  toggleHiddenBtn.hidden = !isAdmin;
+  toggleHiddenBtn.textContent = state.showHidden ? "Esconder campos ocultos" : "Mostrar campos ocultos";
 }
 
 async function onSignedIn(session) {

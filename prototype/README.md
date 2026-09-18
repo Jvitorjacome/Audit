@@ -88,6 +88,35 @@ Isso cobre o caso de auditoria real: uma propriedade nova entra na empresa → a
 Campos. Tudo fica salvo no banco imediatamente e já aparece para qualquer outro auditor que
 atualizar a página (ou clicar em "Atualizar dados").
 
+## Ocultar e renomear campos (admin)
+
+Além de adicionar/remover, cada **campo auditado** tem dois botões extras (visíveis só pra
+`admin`):
+
+- **✎ (renomear)** — pede o novo nome e atualiza na hora. Útil quando o nome real do item mudou.
+- **🗕/🗗 (ocultar/mostrar)** — tira o campo da visualização padrão sem apagar nada: o histórico
+  de status continua no banco intacto, só some da lista do dia a dia. Serve pra quando algo não
+  precisa mais ser auditado, mas você não quer perder o que já foi registrado.
+
+Campos ocultos ficam de fora por padrão. Um botão **"Mostrar campos ocultos"** na barra de
+ferramentas (só pra admin) revela todos de novo, esmaecidos e marcados com "(oculto)", pra você
+conseguir achar e reativar algum se precisar.
+
+## Ocorrência (colunas E-H da aba "Observações")
+
+Além dos 5 indicadores fixos, cada campo tem um bloco opcional de **rastreio de ocorrência**,
+espelhando as colunas E-H da aba "Observações" da planilha "Setor Auditoria":
+
+1. **Ocorrências por tipo** — o que aconteceu (Não lançado, Débito duplicado, Valor menor que o
+   target, etc.).
+2. **Corrigido?** — Sim/Não.
+3. **Setor responsável** — Compras, Financeiro, Host, RH...
+4. **Funcionário responsável** — quem é o responsável.
+
+Pra não poluir o painel à toa, eles aparecem **em cascata**: só depois de marcar o tipo de
+ocorrência é que "Corrigido?" aparece, e assim por diante. Se nenhuma ocorrência houver naquele
+mês, o campo simplesmente fica com só os 5 indicadores de sempre.
+
 ## Limitações conhecidas
 
 - **Sem tempo real "ao vivo"**: se outra pessoa editar algo enquanto você está com a página
