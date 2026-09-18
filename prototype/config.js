@@ -55,41 +55,16 @@ const HIERARCHY = {
 // Rastreio de ocorrência (colunas E-H da aba "Observações" da planilha
 // "Setor Auditoria"). Aparecem em cascata no painel: cada campo só é
 // mostrado depois que o anterior da lista tem um valor marcado.
+// `dynamic: true` significa que a lista de opções vem do banco (tabela
+// ocorrencia_options), editável por um admin direto no painel — as opções
+// abaixo em `options` são só o fallback estático pra "Corrigido?", que é
+// sempre binário e não precisa crescer.
 const OCORRENCIA_FIELDS = [
-  {
-    key: "ocorrenciaTipo",
-    label: "Ocorrências por tipo",
-    column: "ocorrencia_tipo",
-    options: [
-      "Centro de custo",
-      "Competência",
-      "Competência Errada",
-      "Débito duplicado",
-      "Descrição",
-      "Não lançado",
-      "Pontuação Inválida",
-      "Propriedade",
-      "Valor",
-      "Sem código",
-      "Não pago",
-      "Não lançado e nem Pago",
-      "Pagamento duplicado",
-      "Valor menor que o target",
-      "Valor maior que o target",
-      "Pago, mas não lançado",
-    ],
-  },
+  { key: "ocorrenciaTipo", label: "Ocorrências por tipo", column: "ocorrencia_tipo", dynamic: true },
+  { key: "setorResponsavel", label: "Setor responsável", column: "setor_responsavel", dynamic: true },
+  { key: "funcionarioResponsavel", label: "Funcionário responsável", column: "funcionario_responsavel", dynamic: true },
   { key: "corrigido", label: "Corrigido?", column: "corrigido", options: ["Sim", "Não"] },
-  {
-    key: "setorResponsavel",
-    label: "Setor responsável",
-    column: "setor_responsavel",
-    options: ["Compras", "Diretoria, Financeiro", "Financeiro", "Host", "RH"],
-  },
-  {
-    key: "funcionarioResponsavel",
-    label: "Funcionário responsável",
-    column: "funcionario_responsavel",
-    options: ["Cinthia Melo", "Gabriel", "João Victor Raimundo", "Rafaela Silva", "Sergio Roberto", "João Jácome", "Ernandes"],
-  },
 ];
+
+// valor especial usado no <select> pra representar "+ Adicionar novo..."
+const ADD_NEW_OPTION = "__add_new__";

@@ -100,6 +100,52 @@ create index on cost_centers (property_id);
 create index on audit_fields (cost_center_id);
 
 -- ----------------------------------------------------------------------------
+-- Opções editáveis dos campos de ocorrência (tipo, setor e funcionário
+-- responsáveis) — um admin pode adicionar novos valores direto no painel
+-- (ex.: funcionário novo, tipo de ocorrência novo) sem precisar de migração.
+-- "Corrigido?" fica de fora por ser sempre binário (Sim/Não).
+-- ----------------------------------------------------------------------------
+create table ocorrencia_options (
+  id uuid primary key default gen_random_uuid(),
+  field_key text not null check (field_key in ('ocorrenciaTipo', 'setorResponsavel', 'funcionarioResponsavel')),
+  value text not null,
+  sort_order int not null default 0,
+  created_at timestamptz not null default now(),
+  created_by uuid references profiles(id),
+  unique (field_key, value)
+);
+
+insert into ocorrencia_options (field_key, value, sort_order) values
+  ('ocorrenciaTipo', 'Centro de custo', 0),
+  ('ocorrenciaTipo', 'Competência', 1),
+  ('ocorrenciaTipo', 'Competência Errada', 2),
+  ('ocorrenciaTipo', 'Débito duplicado', 3),
+  ('ocorrenciaTipo', 'Descrição', 4),
+  ('ocorrenciaTipo', 'Não lançado', 5),
+  ('ocorrenciaTipo', 'Pontuação Inválida', 6),
+  ('ocorrenciaTipo', 'Propriedade', 7),
+  ('ocorrenciaTipo', 'Valor', 8),
+  ('ocorrenciaTipo', 'Sem código', 9),
+  ('ocorrenciaTipo', 'Não pago', 10),
+  ('ocorrenciaTipo', 'Não lançado e nem Pago', 11),
+  ('ocorrenciaTipo', 'Pagamento duplicado', 12),
+  ('ocorrenciaTipo', 'Valor menor que o target', 13),
+  ('ocorrenciaTipo', 'Valor maior que o target', 14),
+  ('ocorrenciaTipo', 'Pago, mas não lançado', 15),
+  ('setorResponsavel', 'Compras', 0),
+  ('setorResponsavel', 'Diretoria, Financeiro', 1),
+  ('setorResponsavel', 'Financeiro', 2),
+  ('setorResponsavel', 'Host', 3),
+  ('setorResponsavel', 'RH', 4),
+  ('funcionarioResponsavel', 'Cinthia Melo', 0),
+  ('funcionarioResponsavel', 'Gabriel', 1),
+  ('funcionarioResponsavel', 'João Victor Raimundo', 2),
+  ('funcionarioResponsavel', 'Rafaela Silva', 3),
+  ('funcionarioResponsavel', 'Sergio Roberto', 4),
+  ('funcionarioResponsavel', 'João Jácome', 5),
+  ('funcionarioResponsavel', 'Ernandes', 6);
+
+-- ----------------------------------------------------------------------------
 -- Status mensal: uma linha por campo auditado × mês. Os 5 indicadores viram
 -- colunas reais (não EAV) porque isso é o que faz dashboards e agregações
 -- serem SQL simples em vez de pivô manual. `extra` (jsonb) existe justamente
@@ -229,6 +275,7 @@ alter table audit_fields enable row level security;
 alter table audit_status enable row level security;
 alter table audit_status_history enable row level security;
 alter table profiles enable row level security;
+alter table ocorrencia_options enable row level security;
 
 create policy "authenticated read" on sections for select using (auth.role() = 'authenticated');
 create policy "authenticated read" on states for select using (auth.role() = 'authenticated');
@@ -238,6 +285,7 @@ create policy "authenticated read" on audit_fields for select using (auth.role()
 create policy "authenticated read" on audit_status for select using (auth.role() = 'authenticated');
 create policy "authenticated read" on audit_status_history for select using (auth.role() = 'authenticated');
 create policy "own profile read" on profiles for select using (auth.role() = 'authenticated');
+create policy "authenticated read" on ocorrencia_options for select using (auth.role() = 'authenticated');
 
 -- Status: qualquer auditor autenticado pode editar (é o trabalho dele)
 create policy "authenticated write status" on audit_status for insert with check (auth.role() = 'authenticated');
@@ -257,5 +305,8 @@ create policy "admin write cost_centers" on cost_centers for all using (
   exists (select 1 from profiles where id = auth.uid() and role = 'admin')
 );
 create policy "admin write audit_fields" on audit_fields for all using (
+  exists (select 1 from profiles where id = auth.uid() and role = 'admin')
+);
+create policy "admin write ocorrencia_options" on ocorrencia_options for all using (
   exists (select 1 from profiles where id = auth.uid() and role = 'admin')
 );

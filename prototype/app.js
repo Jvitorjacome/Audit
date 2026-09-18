@@ -86,6 +86,7 @@ let state = {
   visibleMonths: (savedPrefs && savedPrefs.visibleMonths) || MONTHS.filter((m) => m.inOriginal).map((m) => m.key),
   collapsed: (savedPrefs && savedPrefs.collapsed) || {},
   showHidden: (savedPrefs && savedPrefs.showHidden) || false,
+  ocorrenciaOptions: {},
 };
 
 let currentUser = null;
@@ -231,14 +232,15 @@ function rebuildTreeFromCache() {
 }
 
 async function loadAll() {
-  const [sections, states, properties, costCenters, auditFields] = await Promise.all([
+  const [sections, states, properties, costCenters, auditFields, ocorrenciaOptions] = await Promise.all([
     sb.from("sections").select("*").order("sort_order"),
     sb.from("states").select("*").order("sort_order"),
     sb.from("properties").select("*").order("sort_order"),
     sb.from("cost_centers").select("*").order("sort_order"),
     sb.from("audit_fields").select("*").order("sort_order"),
+    sb.from("ocorrencia_options").select("*").order("sort_order"),
   ]);
-  for (const r of [sections, states, properties, costCenters, auditFields]) if (r.error) throw r.error;
+  for (const r of [sections, states, properties, costCenters, auditFields, ocorrenciaOptions]) if (r.error) throw r.error;
 
   rawHierarchy = {
     sections: sections.data, states: states.data, properties: properties.data,
@@ -246,9 +248,23 @@ async function loadAll() {
   };
   rebuildTreeFromCache();
 
+  state.ocorrenciaOptions = {};
+  for (const row of ocorrenciaOptions.data) {
+    (state.ocorrenciaOptions[row.field_key] ||= []).push(row.value);
+  }
+
   const statusRes = await sb.from("audit_status").select("*").eq("year", YEAR);
   if (statusRes.error) throw statusRes.error;
   state.cells = buildCells(statusRes.data);
+}
+
+async function addOcorrenciaOption(fieldKey, value) {
+  const sortOrder = (state.ocorrenciaOptions[fieldKey] || []).length;
+  const { error } = await sb.from("ocorrencia_options").insert({
+    field_key: fieldKey, value, sort_order: sortOrder, created_by: currentUser.id,
+  });
+  if (error) throw error;
+  (state.ocorrenciaOptions[fieldKey] ||= []).push(value);
 }
 
 async function addNode(kind, parentId, siblingCount, rawName) {
@@ -722,14 +738,40 @@ function openDrawer(node, month, kindLabel) {
     blankOpt.textContent = "— selecionar —";
     if (!value) blankOpt.selected = true;
     select.appendChild(blankOpt);
-    for (const opt of f.options) {
+    const opts = f.dynamic ? (state.ocorrenciaOptions[f.key] || []) : f.options;
+    for (const opt of opts) {
       const o = document.createElement("option");
       o.value = opt;
       o.textContent = opt;
       if (opt === value) o.selected = true;
       select.appendChild(o);
     }
+    if (f.dynamic && isAdmin) {
+      const addOpt = document.createElement("option");
+      addOpt.value = ADD_NEW_OPTION;
+      addOpt.textContent = "+ Adicionar novo...";
+      select.appendChild(addOpt);
+    }
     select.addEventListener("change", async () => {
+      if (select.value === ADD_NEW_OPTION) {
+        const newValue = prompt(`Novo valor para "${f.label}":`);
+        if (!newValue || !newValue.trim()) {
+          select.value = value;
+          return;
+        }
+        setSaving("saving");
+        try {
+          await addOcorrenciaOption(f.key, newValue.trim());
+          await persistCellField(drawerCtx.id, drawerCtx.monthKey, f.key, newValue.trim());
+          setSaving("saved");
+          openDrawer(node, useMonth, kindLabel);
+        } catch (err) {
+          setSaving("error");
+          alert("Não foi possível adicionar a opção: " + describeError(err, "structure"));
+          select.value = value;
+        }
+        return;
+      }
       setSaving("saving");
       try {
         await persistCellField(drawerCtx.id, drawerCtx.monthKey, f.key, select.value);

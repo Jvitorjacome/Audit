@@ -19,13 +19,19 @@ projeto Supabase de produção da QAVI** ("Auditoria - Qavi", projeto
   contém o resultado de todas elas — só use a pasta `migrations/` se estiver
   aplicando em um projeto que já rodava uma versão anterior do schema.
 
-### ⚠️ Pendente: `migrations/003_fix_audit_history_trigger_rls.sql`
+### ⚠️ Pendente: `migrations/004_ocorrencia_options_table.sql`
 
-Ainda não foi aplicada. Corrige um bug real do schema original: `audit_status_history`
-tinha RLS ativado sem nenhuma política de INSERT, então o gatilho de trilha de
-auditoria falhava e derrubava a atualização inteira sempre que alguém editava (não
-criava pela 1ª vez) um status — inclusive um admin. **Precisa rodar essa migração**
-pra conseguir editar um status pela segunda vez em diante.
+Ainda não foi aplicada. Cria a tabela `ocorrencia_options`, que torna as listas de
+"Ocorrências por tipo", "Setor responsável" e "Funcionário responsável" editáveis
+por um admin direto no app (botão "+ Adicionar novo..." no dropdown), em vez de
+fixas no código. Sem essa migração, esses 3 dropdowns aparecem vazios.
+
+### `migrations/003_fix_audit_history_trigger_rls.sql`
+
+Já aplicada. Corrigiu um bug real do schema original: `audit_status_history` tinha
+RLS ativado sem nenhuma política de INSERT, então o gatilho de trilha de auditoria
+falhava e derrubava a atualização inteira sempre que alguém editava (não criava pela
+1ª vez) um status — inclusive um admin.
 
 ### `migrations/002_hide_fields_and_ocorrencia_tracking.sql`
 

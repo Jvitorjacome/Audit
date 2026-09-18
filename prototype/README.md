@@ -109,13 +109,20 @@ espelhando as colunas E-H da aba "Observações" da planilha "Setor Auditoria":
 
 1. **Ocorrências por tipo** — o que aconteceu (Não lançado, Débito duplicado, Valor menor que o
    target, etc.).
-2. **Corrigido?** — Sim/Não.
-3. **Setor responsável** — Compras, Financeiro, Host, RH...
-4. **Funcionário responsável** — quem é o responsável.
+2. **Setor responsável** — Compras, Financeiro, Host, RH...
+3. **Funcionário responsável** — quem é o responsável.
+4. **Corrigido?** — Sim/Não (sempre por último, e sempre só essas duas opções).
 
 Pra não poluir o painel à toa, eles aparecem **em cascata**: só depois de marcar o tipo de
-ocorrência é que "Corrigido?" aparece, e assim por diante. Se nenhuma ocorrência houver naquele
-mês, o campo simplesmente fica com só os 5 indicadores de sempre.
+ocorrência é que "Setor responsável" aparece, e assim por diante. Se nenhuma ocorrência houver
+naquele mês, o campo simplesmente fica com só os 5 indicadores de sempre.
+
+As opções de **Ocorrências por tipo**, **Setor responsável** e **Funcionário responsável** não
+são mais fixas no código — vêm do banco (tabela `ocorrencia_options`) e qualquer `admin` pode
+adicionar uma nova direto pelo dropdown: escolha **"+ Adicionar novo..."** no final da lista,
+digite o valor novo, e ele já fica salvo e selecionado na hora — nenhuma outra pessoa que abrir o
+sistema depois precisa reconfigurar nada. Serve pra quando entra funcionário novo, aparece um tipo
+de ocorrência que ainda não existia, etc.
 
 ## Limitações conhecidas
 
