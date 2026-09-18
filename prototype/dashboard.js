@@ -65,6 +65,10 @@ function collectDashboardRows() {
     for (const m of MONTHS) {
       const raw = state.cells[cellKey(campoId, m.key)];
       if (!raw) continue;
+      // "analisado" = pelo menos um dos 5 indicadores foi de fato marcado
+      // (não conta uma célula tocada só pra preencher valor/observações/ocorrência).
+      const wasAssessed = STATUS_FIELDS.some((f) => raw[f.key] && raw[f.key] !== "Não verificado");
+      if (!wasAssessed) continue;
       analyzedByMonth[m.key] = (analyzedByMonth[m.key] || 0) + 1;
       const hasNaoConforme = STATUS_FIELDS.some((f) => raw[f.key] === "Não Conforme");
       if (!hasNaoConforme) continue;
@@ -98,7 +102,10 @@ function computeDashboardMetrics(dataset, mesFilter, propFilter) {
   const taxaConformidadeTotal = Math.max(0, 100 - taxaErroTotal);
 
   const sumWhere = (pred) => rows.filter(pred).reduce((s, r) => s + r.valor, 0);
+  // Por ora sem separar QAVI/proprietário (fica pra próxima rodada) — só o total
+  // impactado (não corrigido) e o total já corrigido.
   const valorImpactado = sumWhere((r) => r.corrigido === "Não");
+  const valorCorrigido = sumWhere((r) => r.corrigido === "Sim");
   const corrigidoQAVI = sumWhere((r) => r.corrigido === "Sim" && r.impactType === "qavi");
   const corrigidoProprietario = sumWhere((r) => r.corrigido === "Sim" && r.impactType === "proprietario");
   const impactoQAVI = sumWhere((r) => r.corrigido === "Não" && r.impactType === "qavi");
@@ -147,7 +154,7 @@ function computeDashboardMetrics(dataset, mesFilter, propFilter) {
 
   return {
     totalAnalyzed, totalErros, taxaConformidadeTotal, taxaErroTotal,
-    valorImpactado, corrigidoQAVI, corrigidoProprietario, impactoQAVI, impactoProprietario,
+    valorImpactado, valorCorrigido, corrigidoQAVI, corrigidoProprietario, impactoQAVI, impactoProprietario,
     errosPorSetor, errosPorFuncionario, conformidadePorMes, errosPorPropriedade, ocorrenciasPorTipo,
     monthsInScope,
   };
@@ -351,23 +358,17 @@ function renderDashboardBody(dataset) {
 
   const m = computeDashboardMetrics(dataset, dashFilterState.mes, dashFilterState.prop);
 
-  // KPIs — linha 1
-  const kpiGrid1 = document.createElement("div");
-  kpiGrid1.className = "dash-kpi-grid";
-  kpiGrid1.appendChild(dashKpiCard("Total analisado", m.totalAnalyzed.toLocaleString("pt-BR"), m.monthsInScope.length + " mês(es) no escopo"));
-  kpiGrid1.appendChild(dashKpiCard("Não conformidades", m.totalErros.toLocaleString("pt-BR"), `${m.taxaErroTotal.toFixed(2)}% de erro`, "critical"));
-  kpiGrid1.appendChild(dashKpiCard("Taxa de conformidade", `${m.taxaConformidadeTotal.toFixed(1)}%`, "Itens conformes", "good"));
-  kpiGrid1.appendChild(dashKpiCard("Impacto financeiro", dashFormatCurrency(m.valorImpactado), 'Erros com "Corrigido = Não"', "critical"));
-  body.appendChild(kpiGrid1);
-
-  // KPIs — linha 2 (impacto detalhado)
-  const kpiGrid2 = document.createElement("div");
-  kpiGrid2.className = "dash-kpi-grid";
-  kpiGrid2.appendChild(dashKpiCard("Impacto QAVI (não corrigido)", dashFormatCurrency(m.impactoQAVI), "Pago menor que o target / não lançado", "warning"));
-  kpiGrid2.appendChild(dashKpiCard("Impacto proprietário (não corrigido)", dashFormatCurrency(m.impactoProprietario), "Demais não conformidades", "critical"));
-  kpiGrid2.appendChild(dashKpiCard("Corrigido QAVI", dashFormatCurrency(m.corrigidoQAVI), "Seria impacto QAVI, já corrigido", "good"));
-  kpiGrid2.appendChild(dashKpiCard("Corrigido proprietário", dashFormatCurrency(m.corrigidoProprietario), "Seria impacto proprietário, já corrigido", "good"));
-  body.appendChild(kpiGrid2);
+  // KPIs. Impacto QAVI x proprietário fica pra uma próxima rodada (a pedido) —
+  // por ora só os totais: analisado, não conformidades (com % de erro),
+  // conformidade, impacto financeiro não corrigido e valores já corrigidos.
+  const kpiGrid = document.createElement("div");
+  kpiGrid.className = "dash-kpi-grid";
+  kpiGrid.appendChild(dashKpiCard("Total analisado", m.totalAnalyzed.toLocaleString("pt-BR"), m.monthsInScope.length + " mês(es) no escopo"));
+  kpiGrid.appendChild(dashKpiCard("Não conformidades", m.totalErros.toLocaleString("pt-BR"), `${m.taxaErroTotal.toFixed(2)}% de erro`, "critical"));
+  kpiGrid.appendChild(dashKpiCard("Taxa de conformidade", `${m.taxaConformidadeTotal.toFixed(1)}%`, "Itens conformes", "good"));
+  kpiGrid.appendChild(dashKpiCard("Impacto financeiro (não corrigido)", dashFormatCurrency(m.valorImpactado), 'Erros com "Corrigido = Não"', "critical"));
+  kpiGrid.appendChild(dashKpiCard("Valores corrigidos", dashFormatCurrency(m.valorCorrigido), 'Erros com "Corrigido = Sim"', "good"));
+  body.appendChild(kpiGrid);
 
   // Erros por setor / funcionário
   const chartRow1 = document.createElement("div");

@@ -142,14 +142,27 @@ dashboard com KPIs e gráficos, inspirado no projeto "Audit Insights Hub" (Lovab
 administrador já usava, mas lendo os dados direto deste banco (não da planilha do Google Sheets).
 Filtra por mês e propriedade, e mostra:
 
-- Total analisado, não conformidades, taxa de conformidade, impacto financeiro.
-- Impacto financeiro detalhado: QAVI vs proprietário, corrigido vs não corrigido (a
-  classificação QAVI/proprietário usa as mesmas palavras-chave do dashboard original —
-  ocorrências como "não lançado" ou "valor menor que o target" contam como impacto QAVI, o
-  resto como impacto do proprietário).
+- **Total analisado** — quantos campos tiveram pelo menos um dos 5 indicadores marcado no mês
+  (não conta célula tocada só por causa de valor/observações/ocorrência), com **% de erro** em
+  cima desse total.
+- **Não conformidades** e **taxa de conformidade**.
+- **Impacto financeiro (não corrigido)** — soma do valor dos campos não conformes com
+  "Corrigido = Não".
+- **Valores corrigidos** — soma do valor dos campos não conformes com "Corrigido = Sim". (A
+  separação QAVI vs proprietário desses dois totais — que existia no Lovable original — fica
+  pra uma próxima rodada, a pedido; o código já calcula essa classificação internamente, só não
+  está exposta na tela ainda.)
 - Erros por setor responsável, por funcionário responsável e por propriedade.
 - Conformidade por mês (cards + gráfico).
 - Ocorrências por tipo, com quantidade e valor total (tabela + gráfico).
+
+**É em tempo real** no sentido que importa: os gráficos leem direto de `state.tree`/`state.cells`
+(os mesmos dados já carregados pela aba Auditoria), então qualquer edição feita no painel lateral
+já aparece assim que você troca pra aba Indicadores — sem precisar recarregar a página. Testado
+de ponta a ponta com um caso real: marcar "Omnibees" (Gaudium) como não conforme em setembro,
+com ocorrência "Descrição"/setor "Financeiro"/funcionário definido, aparece corretamente nos
+KPIs, na lista de erros por propriedade e na tabela de tipos assim que se troca de aba — sem
+mexer no banco diretamente.
 
 Uma diferença de propósito em relação ao original: lá, o gráfico de "Ocorrências por tipo" era
 um donut (pizza). Aqui virou barra — com até 16 tipos possíveis, uma pizza de tantas fatias fica
