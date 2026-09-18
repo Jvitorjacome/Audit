@@ -1,24 +1,26 @@
-const STORAGE_KEY = "dre-prototype-state-v4";
+// ---------- helpers ----------
 
-// ---------- seed cells: flatten every tree node's real sheet data into one lookup ----------
-
-const ALL_SEED_CELLS = {};
-
-function walkTree(nodes, kind, visit) {
-  for (const node of nodes) {
-    visit(node, kind);
-    if (kind === "section") walkTree(node.channels, "channel", visit);
-    else if (kind === "channel") walkTree(node.properties, "property", visit);
-    else if (kind === "property") walkTree(node.centros, "centro", visit);
-    else if (kind === "centro") walkTree(node.campos, "campo", visit);
-  }
+function groupBy(rows, key) {
+  const out = {};
+  for (const r of rows) (out[r[key]] ||= []).push(r);
+  return out;
 }
 
-walkTree(TREE_SECTIONS, "section", (node) => {
-  if (node.cells) {
-    for (const mk in node.cells) ALL_SEED_CELLS[`${node.id}::${mk}`] = node.cells[mk];
+function debounce(fn, wait) {
+  let t;
+  return (...args) => {
+    clearTimeout(t);
+    t = setTimeout(() => fn(...args), wait);
+  };
+}
+
+function describeError(err) {
+  const msg = (err && err.message) || String(err || "erro desconhecido");
+  if (/row-level security|permission denied/i.test(msg)) {
+    return "Você não tem permissão de administrador para alterar a estrutura da árvore.";
   }
-});
+  return msg;
+}
 
 function childrenOf(node, kind) {
   if (kind === "section") return node.channels;
@@ -34,63 +36,61 @@ function childKind(kind) {
 const KIND_LABEL = { section: "Seção", channel: "Estado", property: "Propriedade", centro: "Centro de custo", campo: "Campo auditado" };
 const KIND_ADD_LABEL = { section: "Estado", channel: "Propriedade", property: "Centro de custo", centro: "Campo" };
 
-function makeNode(kind, name, id) {
-  const base = { id, name, row: null, cells: {} };
+function makeNode(kind, name, id, row = null) {
+  const base = { id, name, row };
   if (kind === "channel") return { ...base, properties: [] };
   if (kind === "property") return { ...base, centros: [] };
   if (kind === "centro") return { ...base, campos: [] };
   return base; // campo: leaf
 }
 
-// ---------- state ----------
-
-function cloneTree() {
-  return JSON.parse(JSON.stringify(TREE_SECTIONS));
-}
-
-function loadState() {
-  const fallback = {
-    tree: cloneTree(),
-    cells: {},
-    visibleMonths: MONTHS.filter((m) => m.inOriginal).map((m) => m.key),
-    collapsed: {},
-  };
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return fallback;
-    const parsed = JSON.parse(raw);
-    return {
-      tree: parsed.tree || fallback.tree,
-      cells: parsed.cells || {},
-      visibleMonths: parsed.visibleMonths || fallback.visibleMonths,
-      collapsed: parsed.collapsed || {},
-    };
-  } catch (e) {
-    return fallback;
+function walkTree(nodes, kind, visit) {
+  for (const node of nodes) {
+    visit(node, kind);
+    const kids = childrenOf(node, kind);
+    if (kids) walkTree(kids, childKind(kind), visit);
   }
 }
 
-function saveState() {
+// ---------- view prefs (localStorage: só preferências de tela, não dados de auditoria) ----------
+
+const VIEW_PREFS_KEY = "dre-view-prefs-v1";
+
+function loadViewPrefs() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const raw = localStorage.getItem(VIEW_PREFS_KEY);
+    return raw ? JSON.parse(raw) : null;
   } catch (e) {
-    /* private window / storage blocked - prototype just won't persist */
+    return null;
+  }
+}
+function saveViewPrefs() {
+  try {
+    localStorage.setItem(VIEW_PREFS_KEY, JSON.stringify({ visibleMonths: state.visibleMonths, collapsed: state.collapsed }));
+  } catch (e) {
+    /* private window / storage blocked - só afeta preferência de tela */
   }
 }
 
-let state = loadState();
+const savedPrefs = loadViewPrefs();
+let state = {
+  tree: [],
+  cells: {},
+  visibleMonths: (savedPrefs && savedPrefs.visibleMonths) || MONTHS.filter((m) => m.inOriginal).map((m) => m.key),
+  collapsed: (savedPrefs && savedPrefs.collapsed) || {},
+};
+
+let currentUser = null;
+let currentProfile = null;
+let isAdmin = false;
+
+// ---------- cells (status mensal, agora vindos do Supabase) ----------
 
 function cellKey(id, monthKey) {
   return `${id}::${monthKey}`;
 }
 function getCell(id, monthKey) {
-  const key = cellKey(id, monthKey);
-  return { ...(ALL_SEED_CELLS[key] || {}), ...(state.cells[key] || {}) };
-}
-function setCellField(id, monthKey, field, value) {
-  const key = cellKey(id, monthKey);
-  state.cells[key] = { ...getCell(id, monthKey), [field]: value };
-  saveState();
+  return state.cells[cellKey(id, monthKey)] || {};
 }
 function statusTone(value) {
   if (value === "Conforme") return "ok";
@@ -112,10 +112,24 @@ function cellAggregateTone(id, monthKey) {
   if (naoVerificado > 0) return { tone: "unv", label: "Pendente" };
   return { tone: "ok", label: "Conforme" };
 }
-
 function cellDetailTitle(id, monthKey) {
   const cell = getCell(id, monthKey);
   return STATUS_FIELDS.map((f) => `${f.label}: ${cell[f.key] || "Não verificado"}`).join(" · ");
+}
+
+async function persistCellField(auditFieldId, monthKey, uiFieldKey, uiValue) {
+  const month = MONTHS.find((m) => m.key === monthKey).number;
+  const payload = { audit_field_id: auditFieldId, year: YEAR, month, updated_by: currentUser.id };
+  const statusField = STATUS_FIELDS.find((f) => f.key === uiFieldKey);
+  if (statusField) payload[statusField.column] = STATUS_LABEL_TO_DB[uiValue];
+  else if (uiFieldKey === "valorBaseTarget") payload.valor_base_target = uiValue;
+  else if (uiFieldKey === "observacoes") payload.observacoes = uiValue;
+
+  const { error } = await sb.from("audit_status").upsert(payload, { onConflict: "audit_field_id,year,month" });
+  if (error) throw error;
+
+  const key = cellKey(auditFieldId, monthKey);
+  state.cells[key] = { ...getCell(auditFieldId, monthKey), [uiFieldKey]: uiValue };
 }
 
 function countLeaves(node, kind) {
@@ -156,6 +170,75 @@ function countDescendantNodes(node, kind) {
   return kids.length + kids.reduce((sum, k) => sum + countDescendantNodes(k, nextKind), 0);
 }
 
+// ---------- Supabase: carregar árvore + status ----------
+
+function buildTree(sections, states, properties, costCenters, auditFields) {
+  const statesBySection = groupBy(states, "section_id");
+  const propertiesByState = groupBy(properties, "state_id");
+  const costCentersByProperty = groupBy(costCenters, "property_id");
+  const auditFieldsByCostCenter = groupBy(auditFields, "cost_center_id");
+
+  return sections.map((s) => ({
+    id: s.id, name: s.name, row: s.source_row,
+    channels: (statesBySection[s.id] || []).map((st) => ({
+      id: st.id, name: st.name, row: st.source_row,
+      properties: (propertiesByState[st.id] || []).map((p) => ({
+        id: p.id, name: p.name, row: p.source_row,
+        centros: (costCentersByProperty[p.id] || []).map((cc) => ({
+          id: cc.id, name: cc.name, row: cc.source_row,
+          campos: (auditFieldsByCostCenter[cc.id] || []).map((af) => ({
+            id: af.id, name: af.name, row: af.source_row,
+          })),
+        })),
+      })),
+    })),
+  }));
+}
+
+function buildCells(statusRows) {
+  const cells = {};
+  for (const row of statusRows) {
+    const m = MONTH_BY_NUMBER[row.month];
+    if (!m) continue;
+    const cell = { valorBaseTarget: row.valor_base_target || "", observacoes: row.observacoes || "" };
+    for (const f of STATUS_FIELDS) cell[f.key] = STATUS_DB_TO_LABEL[row[f.column]] || "Não verificado";
+    cells[cellKey(row.audit_field_id, m.key)] = cell;
+  }
+  return cells;
+}
+
+async function loadAll() {
+  const [sections, states, properties, costCenters, auditFields] = await Promise.all([
+    sb.from("sections").select("*").order("sort_order"),
+    sb.from("states").select("*").order("sort_order"),
+    sb.from("properties").select("*").order("sort_order"),
+    sb.from("cost_centers").select("*").order("sort_order"),
+    sb.from("audit_fields").select("*").order("sort_order"),
+  ]);
+  for (const r of [sections, states, properties, costCenters, auditFields]) if (r.error) throw r.error;
+
+  state.tree = buildTree(sections.data, states.data, properties.data, costCenters.data, auditFields.data);
+
+  const statusRes = await sb.from("audit_status").select("*").eq("year", YEAR);
+  if (statusRes.error) throw statusRes.error;
+  state.cells = buildCells(statusRes.data);
+}
+
+async function addNode(kind, parentId, siblingCount, rawName) {
+  const cfg = HIERARCHY[kind];
+  const finalName = kind === "channel" ? rawName.trim().toUpperCase() : rawName.trim();
+  const payload = { name: finalName, sort_order: siblingCount, created_by: currentUser.id, [cfg.parentColumn]: parentId };
+  const { data, error } = await sb.from(cfg.table).insert(payload).select().single();
+  if (error) throw error;
+  return makeNode(kind, data.name, data.id, data.source_row);
+}
+
+async function deleteNode(kind, id) {
+  const cfg = HIERARCHY[kind];
+  const { error } = await sb.from(cfg.table).delete().eq("id", id);
+  if (error) throw error;
+}
+
 // ---------- DOM refs ----------
 
 const monthFilterEl = document.getElementById("monthFilter");
@@ -163,6 +246,9 @@ const summaryEl = document.getElementById("summary");
 const drawerEl = document.getElementById("drawer");
 const drawerBackdrop = document.getElementById("drawerBackdrop");
 const treeWrap = document.getElementById("treeWrap");
+const authScreenEl = document.getElementById("authScreen");
+const appScreenEl = document.getElementById("appScreen");
+const loadErrorEl = document.getElementById("loadError");
 
 function visibleMonthList() {
   return MONTHS.filter((m) => state.visibleMonths.includes(m.key));
@@ -181,7 +267,7 @@ function renderMonthFilter() {
       state.visibleMonths = active
         ? state.visibleMonths.filter((k) => k !== m.key)
         : [...state.visibleMonths, m.key].sort((a, b) => MONTHS.findIndex((mm) => mm.key === a) - MONTHS.findIndex((mm) => mm.key === b));
-      saveState();
+      saveViewPrefs();
       render();
     });
     monthFilterEl.appendChild(chip);
@@ -283,7 +369,7 @@ function renderTreeTable() {
       toggle.addEventListener("click", (e) => {
         e.stopPropagation();
         state.collapsed[node.id] = !collapsed;
-        saveState();
+        saveViewPrefs();
         renderTreeTable();
       });
       tdName.appendChild(toggle);
@@ -303,7 +389,7 @@ function renderTreeTable() {
     const nameSpan = document.createElement("span");
     nameSpan.className = "node-name";
     nameSpan.textContent = node.name || "(sem nome)";
-    nameSpan.title = `${KIND_LABEL[kind]}${node.row ? " · linha " + node.row + " na planilha original" : " · adicionado neste protótipo"}`;
+    nameSpan.title = `${KIND_LABEL[kind]}${node.row ? " · linha " + node.row + " na planilha original" : " · adicionado neste sistema"}`;
     tdName.appendChild(nameSpan);
 
     if (hasKids) {
@@ -326,42 +412,55 @@ function renderTreeTable() {
 
     const tdActions = document.createElement("td");
     tdActions.className = "col-actions";
-    if (hasKids) {
+    if (hasKids && isAdmin) {
       const addLabel = KIND_ADD_LABEL[kind];
       const addBtn = document.createElement("button");
       addBtn.type = "button";
       addBtn.className = "row-add";
       addBtn.title = `Adicionar ${addLabel.toLowerCase()} aqui dentro`;
       addBtn.textContent = "+";
-      addBtn.addEventListener("click", (e) => {
+      addBtn.addEventListener("click", async (e) => {
         e.stopPropagation();
         const name = prompt(`Nome do novo ${addLabel.toLowerCase()}:`);
         if (!name || !name.trim()) return;
-        const finalName = nextKind === "channel" ? name.trim().toUpperCase() : name.trim();
-        const child = makeNode(nextKind, finalName, `custom-${Date.now()}`);
-        kids.push(child);
-        state.collapsed[node.id] = false;
-        saveState();
-        renderTreeTable();
+        addBtn.disabled = true;
+        try {
+          const child = await addNode(nextKind, node.id, kids.length, name);
+          kids.push(child);
+          state.collapsed[node.id] = false;
+          saveViewPrefs();
+          renderTreeTable();
+          renderSummary();
+        } catch (err) {
+          alert("Não foi possível adicionar: " + describeError(err));
+        } finally {
+          addBtn.disabled = false;
+        }
       });
       tdActions.appendChild(addBtn);
     }
-    if (kind !== "section" && parentArray) {
+    if (kind !== "section" && parentArray && isAdmin) {
       const delBtn = document.createElement("button");
       delBtn.type = "button";
       delBtn.className = "row-delete";
       const nested = hasKids ? countDescendantNodes(node, kind) : 0;
       delBtn.title = nested > 0 ? `Remover (leva junto ${nested} item(ns) abaixo)` : `Remover ${KIND_LABEL[kind].toLowerCase()}`;
       delBtn.textContent = "×";
-      delBtn.addEventListener("click", (e) => {
+      delBtn.addEventListener("click", async (e) => {
         e.stopPropagation();
         const warn = nested > 0 ? ` Isso remove também os ${nested} item(ns) dentro dele/dela.` : "";
         if (!confirm(`Remover "${node.name}" (${KIND_LABEL[kind]})?${warn}`)) return;
-        const idx = parentArray.indexOf(node);
-        if (idx >= 0) parentArray.splice(idx, 1);
-        saveState();
-        renderTreeTable();
-        renderSummary();
+        delBtn.disabled = true;
+        try {
+          await deleteNode(kind, node.id);
+          const idx = parentArray.indexOf(node);
+          if (idx >= 0) parentArray.splice(idx, 1);
+          renderTreeTable();
+          renderSummary();
+        } catch (err) {
+          alert("Não foi possível remover: " + describeError(err));
+          delBtn.disabled = false;
+        }
       });
       tdActions.appendChild(delBtn);
     }
@@ -419,6 +518,37 @@ function render() {
 
 let drawerCtx = null;
 
+function setSaving(kind) {
+  const el = document.getElementById("drawerSaveStatus");
+  if (!el) return;
+  el.hidden = false;
+  if (kind === "saving") {
+    el.textContent = "Salvando…";
+    el.className = "save-status save-status-pending";
+  } else if (kind === "saved") {
+    el.textContent = "Salvo";
+    el.className = "save-status save-status-ok";
+    setTimeout(() => { if (el.textContent === "Salvo") el.hidden = true; }, 1500);
+  } else {
+    el.textContent = "Erro ao salvar";
+    el.className = "save-status save-status-error";
+  }
+}
+
+function makeTextPersister(uiFieldKey) {
+  return debounce(async (id, monthKey, value) => {
+    setSaving("saving");
+    try {
+      await persistCellField(id, monthKey, uiFieldKey, value);
+      setSaving("saved");
+    } catch (err) {
+      setSaving("error");
+    }
+  }, 600);
+}
+const persistValor = makeTextPersister("valorBaseTarget");
+const persistObs = makeTextPersister("observacoes");
+
 function openDrawer(node, month, kindLabel) {
   const months = visibleMonthList();
   const useMonth = month || months[0];
@@ -428,6 +558,8 @@ function openDrawer(node, month, kindLabel) {
 
   document.getElementById("drawerTitle").textContent = node.name || "(sem nome)";
   document.getElementById("drawerKind").textContent = kindLabel || "";
+  const saveStatusEl = document.getElementById("drawerSaveStatus");
+  if (saveStatusEl) saveStatusEl.hidden = true;
 
   const monthSelectEl = document.getElementById("drawerMonth");
   monthSelectEl.innerHTML = "";
@@ -440,7 +572,7 @@ function openDrawer(node, month, kindLabel) {
   }
   monthSelectEl.onchange = () => openDrawer(node, MONTHS.find((m) => m.key === monthSelectEl.value), kindLabel);
 
-  document.getElementById("drawerSubtitle").textContent = node.row ? `linha ${node.row} na planilha original` : "adicionado neste protótipo";
+  document.getElementById("drawerSubtitle").textContent = node.row ? `linha ${node.row} na planilha original` : "adicionado neste sistema";
 
   const fieldsEl = document.getElementById("drawerFields");
   fieldsEl.innerHTML = "";
@@ -458,10 +590,18 @@ function openDrawer(node, month, kindLabel) {
       if (opt === value) o.selected = true;
       select.appendChild(o);
     }
-    select.addEventListener("change", () => {
+    select.addEventListener("change", async () => {
       select.className = `select select-${statusTone(select.value)}`;
-      setCellField(drawerCtx.id, drawerCtx.monthKey, f.key, select.value);
-      render();
+      setSaving("saving");
+      try {
+        await persistCellField(drawerCtx.id, drawerCtx.monthKey, f.key, select.value);
+        setSaving("saved");
+        renderTreeTable();
+        renderSummary();
+      } catch (err) {
+        setSaving("error");
+        alert("Não foi possível salvar: " + describeError(err));
+      }
     });
     wrap.appendChild(select);
     fieldsEl.appendChild(wrap);
@@ -469,11 +609,11 @@ function openDrawer(node, month, kindLabel) {
 
   const valorInput = document.getElementById("drawerValor");
   valorInput.value = cell.valorBaseTarget || "";
-  valorInput.oninput = () => setCellField(drawerCtx.id, drawerCtx.monthKey, "valorBaseTarget", valorInput.value);
+  valorInput.oninput = () => persistValor(drawerCtx.id, drawerCtx.monthKey, valorInput.value);
 
   const obsInput = document.getElementById("drawerObservacoes");
   obsInput.value = cell.observacoes || "";
-  obsInput.oninput = () => setCellField(drawerCtx.id, drawerCtx.monthKey, "observacoes", obsInput.value);
+  obsInput.oninput = () => persistObs(drawerCtx.id, drawerCtx.monthKey, obsInput.value);
 
   drawerEl.classList.add("drawer-open");
   drawerBackdrop.classList.add("backdrop-visible");
@@ -495,23 +635,102 @@ document.addEventListener("keydown", (e) => {
 
 document.getElementById("btnAllMonths").addEventListener("click", () => {
   state.visibleMonths = MONTHS.map((m) => m.key);
-  saveState();
+  saveViewPrefs();
   render();
 });
 document.getElementById("btnOriginalMonths").addEventListener("click", () => {
   state.visibleMonths = MONTHS.filter((m) => m.inOriginal).map((m) => m.key);
-  saveState();
+  saveViewPrefs();
   render();
 });
-document.getElementById("btnReset").addEventListener("click", () => {
-  if (!confirm("Restaurar o protótipo para os dados originais da planilha? Suas edições locais (incluindo itens adicionados) serão perdidas.")) return;
-  state = {
-    tree: cloneTree(),
-    cells: {},
-    visibleMonths: MONTHS.filter((m) => m.inOriginal).map((m) => m.key),
-    collapsed: {},
-  };
-  saveState();
-  render();
+document.getElementById("btnRefresh").addEventListener("click", async () => {
+  treeWrap.innerHTML = '<p class="loading-note">Atualizando dados do banco…</p>';
+  try {
+    clearLoadError();
+    await loadAll();
+    render();
+  } catch (err) {
+    showLoadError(err);
+  }
 });
-render();
+
+// ---------- autenticação ----------
+
+function showAuthScreen() {
+  authScreenEl.hidden = false;
+  appScreenEl.hidden = true;
+  currentUser = null;
+  currentProfile = null;
+  isAdmin = false;
+}
+function showAppScreen() {
+  authScreenEl.hidden = true;
+  appScreenEl.hidden = false;
+}
+function showLoadError(err) {
+  loadErrorEl.hidden = false;
+  loadErrorEl.textContent = "Não foi possível carregar os dados: " + describeError(err) + " — clique em \"Atualizar dados\" para tentar de novo.";
+}
+function clearLoadError() {
+  loadErrorEl.hidden = true;
+}
+
+function renderAuthBar() {
+  document.getElementById("authUserLabel").textContent = (currentProfile && currentProfile.full_name) || currentUser.email;
+  const roleBadge = document.getElementById("authRoleBadge");
+  roleBadge.textContent = isAdmin ? "Administrador" : "Auditor";
+  roleBadge.className = "role-badge" + (isAdmin ? " role-badge-admin" : "");
+}
+
+async function onSignedIn(session) {
+  currentUser = session.user;
+  showAppScreen();
+  clearLoadError();
+  treeWrap.innerHTML = '<p class="loading-note">Carregando dados do banco…</p>';
+  summaryEl.innerHTML = "";
+  try {
+    const { data: profile } = await sb.from("profiles").select("*").eq("id", currentUser.id).maybeSingle();
+    currentProfile = profile || null;
+    isAdmin = !!(currentProfile && currentProfile.role === "admin");
+    renderAuthBar();
+    await loadAll();
+    render();
+  } catch (err) {
+    showLoadError(err);
+  }
+}
+
+let handledUserId = null;
+sb.auth.onAuthStateChange((event, session) => {
+  if (event === "SIGNED_OUT" || !session) {
+    handledUserId = null;
+    showAuthScreen();
+    return;
+  }
+  if ((event === "INITIAL_SESSION" || event === "SIGNED_IN") && handledUserId !== session.user.id) {
+    handledUserId = session.user.id;
+    onSignedIn(session);
+  }
+});
+
+document.getElementById("loginForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const email = document.getElementById("loginEmail").value.trim();
+  const password = document.getElementById("loginPassword").value;
+  const errEl = document.getElementById("authError");
+  const submitBtn = document.getElementById("loginSubmit");
+  errEl.hidden = true;
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Entrando…";
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  submitBtn.disabled = false;
+  submitBtn.textContent = "Entrar";
+  if (error) {
+    errEl.textContent = "E-mail ou senha inválidos.";
+    errEl.hidden = false;
+  }
+});
+
+document.getElementById("btnLogout").addEventListener("click", async () => {
+  await sb.auth.signOut();
+});

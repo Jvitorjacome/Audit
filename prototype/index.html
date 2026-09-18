@@ -3,25 +3,47 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DRE Independente</title>
+<title>DRE — Auditoria QAVI</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
-<div class="wrap">
+<div class="auth-screen" id="authScreen">
+  <div class="auth-card">
+    <h1>DRE — Sistema de Auditoria QAVI</h1>
+    <p>Entre com sua conta para acessar os dados de auditoria.</p>
+    <form id="loginForm">
+      <label class="field">
+        <span class="field-label">E-mail</span>
+        <input class="text-input" id="loginEmail" type="email" required autocomplete="username">
+      </label>
+      <label class="field">
+        <span class="field-label">Senha</span>
+        <input class="text-input" id="loginPassword" type="password" required autocomplete="current-password">
+      </label>
+      <p class="auth-error" id="authError" hidden></p>
+      <button class="btn btn-primary" type="submit" id="loginSubmit">Entrar</button>
+    </form>
+  </div>
+</div>
+
+<div class="wrap" id="appScreen" hidden>
   <header class="page-header">
-    <h1>DRE Independente — protótipo local</h1>
-    <p>Grade de indicadores de auditoria com menus suspensos de status e filtro de meses, desacoplada da planilha original.</p>
+    <div class="page-header-top">
+      <div>
+        <h1>DRE — Sistema de Auditoria QAVI</h1>
+        <p>Grade de indicadores de auditoria com status por campo e filtro de meses, conectada ao banco de dados em tempo real.</p>
+      </div>
+      <div class="auth-bar">
+        <span class="auth-user" id="authUserLabel"></span>
+        <span class="role-badge" id="authRoleBadge"></span>
+        <button class="btn" id="btnLogout" type="button">Sair</button>
+      </div>
+    </div>
   </header>
 
-  <div class="notice">
-    Protótipo rodando só neste navegador (dados salvos em <code>localStorage</code>, nada é enviado a lugar nenhum).
-    Escopo atual: só <strong>Bed&amp;Breakfast Manager</strong>, <strong>Bed&amp;Breakfast Leasing</strong> e
-    <strong>Building management</strong> (linhas 272–857 da aba DRE), organizados como
-    Estado → Propriedade → Centro de custo → Campo. O resto da DRE fica de fora por enquanto.
-    Meses marcados com <strong>•</strong> não existiam na estrutura original da planilha — aqui já nascem prontos, sem lacunas.
-  </div>
+  <div class="notice" id="loadError" hidden></div>
 
   <div class="legend">
     <span class="legend-item"><span class="status-badge status-badge-ok">Conforme</span></span>
@@ -35,7 +57,7 @@
     <div class="btn-row">
       <button class="btn" id="btnOriginalMonths" type="button">Só meses da planilha original</button>
       <button class="btn" id="btnAllMonths" type="button">Mostrar ano inteiro</button>
-      <button class="btn btn-danger" id="btnReset" type="button">Limpar dados locais</button>
+      <button class="btn" id="btnRefresh" type="button">Atualizar dados</button>
     </div>
   </div>
 
@@ -47,9 +69,9 @@
     Só o <strong>campo auditado</strong> tem os 5 status — clique nele para abrir o painel (passe o mouse sobre o
     selo da célula pra ver o detalhe dos 5 indicadores). Estado, propriedade e centro de custo mostram, no lugar
     disso, uma barra com o quanto dos campos abaixo deles já foi verificado, com aviso em vermelho só quando há
-    algum não conforme. Use ▾/▸ para recolher/expandir, <strong>+</strong> em qualquer linha para adicionar um
-    item novo dentro dela (estado numa seção, propriedade num estado, centro de custo numa propriedade, ou campo
-    num centro de custo), e <strong>×</strong> para remover.
+    algum não conforme. Use ▾/▸ para recolher/expandir. Administradores também veem <strong>+</strong> em qualquer
+    linha para adicionar um item novo dentro dela (estado numa seção, propriedade num estado, centro de custo numa
+    propriedade, ou campo num centro de custo), e <strong>×</strong> para remover.
   </p>
 </div>
 
@@ -58,6 +80,7 @@
   <div class="drawer-header">
     <div>
       <span class="drawer-kind" id="drawerKind"></span>
+      <span class="save-status" id="drawerSaveStatus" hidden></span>
       <h2 id="drawerTitle">Conta</h2>
       <p id="drawerSubtitle">Mês</p>
     </div>
@@ -84,7 +107,9 @@
   </label>
 </aside>
 
-<script src="data.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="supabaseClient.js"></script>
+<script src="config.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

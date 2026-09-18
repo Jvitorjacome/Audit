@@ -93,6 +93,113 @@ body {
   max-width: 65ch;
 }
 
+.page-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.auth-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.auth-user {
+  font-size: 0.84rem;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.role-badge {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--unv-bg);
+  color: var(--unv-fg);
+}
+.role-badge-admin { background: var(--brand-weak); color: var(--brand); }
+
+/* ---------- tela de login ---------- */
+
+.auth-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 360px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 28px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.auth-card h1 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.auth-card > p {
+  margin: -8px 0 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.auth-card form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.auth-error {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--div-fg);
+}
+
+.btn-primary {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+}
+.btn-primary:hover { color: #fff; opacity: 0.92; }
+
+.loading-note {
+  padding: 24px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.save-status {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 4px;
+  vertical-align: middle;
+}
+.save-status-pending { background: var(--unv-bg); color: var(--unv-fg); }
+.save-status-ok { background: var(--ok-bg); color: var(--ok-fg); }
+.save-status-error { background: var(--div-bg); color: var(--div-fg); }
+
 .notice {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -102,6 +209,11 @@ body {
   padding: 10px 14px;
   font-size: 0.85rem;
   line-height: 1.5;
+}
+
+#loadError {
+  border-left-color: var(--div-fg);
+  color: var(--div-fg);
 }
 
 .toolbar {

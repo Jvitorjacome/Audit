@@ -87,7 +87,21 @@ provavelmente é um campo. Vale uma revisão manual dessa faixa antes de conside
 dados 100% confiáveis — é rápido de corrigir com `UPDATE`s diretos no banco depois de
 identificar os casos errados.
 
-## Próximo passo
+## Frontend já conectado
 
-Com o banco no ar, o `prototype/app.js` precisa trocar `localStorage` por chamadas ao
-Supabase JS client (`@supabase/supabase-js`) — é a próxima peça, ainda não feita.
+`prototype/app.js` já fala com este banco de verdade via `@supabase/supabase-js`
+(login por e-mail/senha, leitura da árvore inteira, escrita de status e das
+mudanças de estrutura) — não usa mais `localStorage` como fonte de dados. Ver
+`prototype/README.md` para os detalhes de como isso funciona e como logar.
+
+O primeiro usuário admin já está cadastrado: `joaogalvao@quartoavista.com.br`
+(perfil `profiles` com `role='admin'`, id `081f9cc8-19f8-4fcf-94e3-c45b342ac614`).
+Para dar acesso a mais auditores, crie o usuário em **Authentication → Users** no
+painel Supabase e rode o `insert into profiles (...)` acima com `role='auditor'`
+(ou `'admin'` se a pessoa também for mexer na estrutura da árvore).
+
+## Próximos passos possíveis
+
+- Hospedar `prototype/` publicamente (Vercel, Netlify...) em vez de só rodar local.
+- Dashboards agregados em cima de `v_audit_overview`.
+- Atualização em tempo real entre auditores via Supabase Realtime.
