@@ -1,8 +1,9 @@
 # Banco de dados — Sistema de Auditoria DRE
 
 Schema PostgreSQL desenhado para Supabase (Postgres gerenciado + Auth + API REST
-instantânea), validado localmente contra um Postgres 16 real antes de ir pro repositório
-(veja "Como eu testei" abaixo).
+instantânea). Validado localmente contra um Postgres 16 real e **já aplicado ao
+projeto Supabase de produção da QAVI** ("Auditoria - Qavi", projeto
+`cxgwnnkcznswvpdophio`) — veja "Status atual" abaixo.
 
 ## Arquivos
 
@@ -12,7 +13,37 @@ instantânea), validado localmente contra um Postgres 16 real antes de ir pro re
   auditáveis que estão no protótipo), gerado automaticamente a partir de
   `prototype/data.js`. Aplique depois do `schema.sql` pra não começar do zero.
 
-## Como aplicar num projeto Supabase novo
+## Status atual: já aplicado em produção
+
+`schema.sql` e `seed.sql` já foram aplicados diretamente no projeto Supabase real
+via MCP. Contagens conferidas em produção (batem exatamente com a validação local):
+
+| Tabela | Linhas |
+|---|---|
+| sections | 3 |
+| states | 20 |
+| properties | 27 |
+| cost_centers | 96 |
+| audit_fields | 441 |
+| audit_status | 1074 |
+
+Rodei também o linter de segurança do Supabase (`get_advisors`) depois de aplicar
+tudo. Corrigi os dois achados que eram meus: a view `v_audit_overview` estava
+`SECURITY DEFINER` (bypassava RLS do usuário que consulta — corrigido pra
+`security_invoker = true`) e a função `log_audit_status_change` estava com
+`search_path` mutável (corrigido fixando `search_path = public, pg_temp`). O único
+aviso restante (`rls_auto_enable`) é uma função de proteção que já vem instalada
+pela própria Supabase em todo projeto novo — não é código deste schema.
+
+**Dados de conexão do frontend** (para configurar `@supabase/supabase-js`):
+- Project URL: `https://cxgwnnkcznswvpdophio.supabase.co`
+- Publishable key: `sb_publishable_f4zfokt0ApU-Etg2P6mwdA_nYMEAJ2N`
+  (ou a legacy anon key equivalente, disponível em Project Settings → API)
+
+Nunca use a **Secret key** no frontend — só a publishable/anon key, que já respeita
+as políticas de RLS.
+
+## Como aplicar num projeto Supabase novo (do zero)
 
 1. Crie um projeto em [supabase.com](https://supabase.com) (tier gratuito serve
    pra começar).
