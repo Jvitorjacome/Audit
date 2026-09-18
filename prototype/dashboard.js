@@ -93,15 +93,26 @@ function collectDashboardRows() {
   return { rows, analyzedByMonth, properties };
 }
 
+// dataset.analyzedByMonth[mk] é { total, byProp } — isola aqui a leitura do
+// número certo conforme o filtro de propriedade, pra não vazar o objeto pra
+// quem só quer a contagem.
+function analyzedCountForMonth(dataset, monthKey, propFilter) {
+  const bucket = dataset.analyzedByMonth[monthKey];
+  if (!bucket) return 0;
+  return propFilter === DASH_ALL ? bucket.total : bucket.byProp[propFilter] || 0;
+}
+
 function computeDashboardMetrics(dataset, mesFilter, propFilter) {
   const rows = dataset.rows.filter(
     (r) => (mesFilter === DASH_ALL || r.mes === mesFilter) && (propFilter === DASH_ALL || r.propriedade === propFilter)
   );
 
   const monthsInScope =
-    mesFilter === DASH_ALL ? MONTHS.filter((m) => dataset.analyzedByMonth[m.key]).map((m) => m.key) : [mesFilter];
+    mesFilter === DASH_ALL
+      ? MONTHS.filter((m) => analyzedCountForMonth(dataset, m.key, propFilter) > 0).map((m) => m.key)
+      : [mesFilter];
 
-  const totalAnalyzed = monthsInScope.reduce((s, mk) => s + (dataset.analyzedByMonth[mk] || 0), 0);
+  const totalAnalyzed = monthsInScope.reduce((s, mk) => s + analyzedCountForMonth(dataset, mk, propFilter), 0);
   const totalErros = rows.length;
   const taxaErroTotal = totalAnalyzed > 0 ? (totalErros / totalAnalyzed) * 100 : 0;
   const taxaConformidadeTotal = Math.max(0, 100 - taxaErroTotal);
@@ -131,7 +142,7 @@ function computeDashboardMetrics(dataset, mesFilter, propFilter) {
 
   const conformidadePorMes = monthsInScope.map((mk) => {
     const m = MONTHS.find((mm) => mm.key === mk);
-    const analisados = dataset.analyzedByMonth[mk] || 0;
+    const analisados = analyzedCountForMonth(dataset, mk, propFilter);
     const erros = rows.filter((r) => r.mes === mk).length;
     const conformes = Math.max(0, analisados - erros);
     return { mesLabel: m.label, analisados, erros, conformes, taxaConf: analisados > 0 ? (conformes / analisados) * 100 : 0 };
