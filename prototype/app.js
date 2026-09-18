@@ -14,10 +14,14 @@ function debounce(fn, wait) {
   };
 }
 
-function describeError(err) {
+function describeError(err, context) {
+  console.error("[erro]", context || "", err);
   const msg = (err && err.message) || String(err || "erro desconhecido");
   if (/row-level security|permission denied/i.test(msg)) {
-    return "Você não tem permissão de administrador para alterar a estrutura da árvore.";
+    if (context === "structure") {
+      return "Você não tem permissão de administrador para alterar a estrutura da árvore. (" + msg + ")";
+    }
+    return "Erro de permissão ao salvar (" + msg + "). Tente recarregar a página; se persistir, avise o administrador.";
   }
   return msg;
 }
@@ -472,7 +476,7 @@ function renderTreeTable() {
           renderTreeTable();
           renderSummary();
         } catch (err) {
-          alert("Não foi possível adicionar: " + describeError(err));
+          alert("Não foi possível adicionar: " + describeError(err, "structure"));
         } finally {
           addBtn.disabled = false;
         }
@@ -495,7 +499,7 @@ function renderTreeTable() {
           node.name = newName.trim();
           renderTreeTable();
         } catch (err) {
-          alert("Não foi possível renomear: " + describeError(err));
+          alert("Não foi possível renomear: " + describeError(err, "structure"));
         } finally {
           renameBtn.disabled = false;
         }
@@ -521,7 +525,7 @@ function renderTreeTable() {
           renderTreeTable();
           renderSummary();
         } catch (err) {
-          alert("Não foi possível " + (wasActive ? "ocultar" : "mostrar") + " o campo: " + describeError(err));
+          alert("Não foi possível " + (wasActive ? "ocultar" : "mostrar") + " o campo: " + describeError(err, "structure"));
         } finally {
           toggleBtn.disabled = false;
         }
@@ -547,7 +551,7 @@ function renderTreeTable() {
           renderTreeTable();
           renderSummary();
         } catch (err) {
-          alert("Não foi possível remover: " + describeError(err));
+          alert("Não foi possível remover: " + describeError(err, "structure"));
           delBtn.disabled = false;
         }
       });
