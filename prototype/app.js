@@ -231,31 +231,46 @@ function rebuildTreeFromCache() {
   );
 }
 
-async function loadAll() {
-  const [sections, states, properties, costCenters, auditFields, ocorrenciaOptions] = await Promise.all([
-    sb.from("sections").select("*").order("sort_order"),
-    sb.from("states").select("*").order("sort_order"),
-    sb.from("properties").select("*").order("sort_order"),
-    sb.from("cost_centers").select("*").order("sort_order"),
-    sb.from("audit_fields").select("*").order("sort_order"),
-    sb.from("ocorrencia_options").select("*").order("sort_order"),
-  ]);
-  for (const r of [sections, states, properties, costCenters, auditFields, ocorrenciaOptions]) if (r.error) throw r.error;
+// O Supabase/PostgREST limita cada resposta a 1000 linhas por padrão. A
+// tabela audit_status já passou disso (cresce a cada mês/campo preenchido) —
+// uma busca sem paginação simplesmente descarta o resto em silêncio, sem
+// erro nenhum, só "sumindo" dados recém-editados da tela. Isso pagina até
+// trazer tudo, em qualquer tabela, não só nessa.
+async function fetchAllRows(table, orderColumn, applyFilters) {
+  const pageSize = 1000;
+  let allRows = [];
+  let from = 0;
+  for (;;) {
+    let q = sb.from(table).select("*").order(orderColumn).order("id").range(from, from + pageSize - 1);
+    if (applyFilters) q = applyFilters(q);
+    const { data, error } = await q;
+    if (error) throw error;
+    allRows = allRows.concat(data);
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  return allRows;
+}
 
-  rawHierarchy = {
-    sections: sections.data, states: states.data, properties: properties.data,
-    costCenters: costCenters.data, auditFields: auditFields.data,
-  };
+async function loadAll() {
+  const [sections, states, properties, costCenters, auditFields, ocorrenciaOptionsRows] = await Promise.all([
+    fetchAllRows("sections", "sort_order"),
+    fetchAllRows("states", "sort_order"),
+    fetchAllRows("properties", "sort_order"),
+    fetchAllRows("cost_centers", "sort_order"),
+    fetchAllRows("audit_fields", "sort_order"),
+    fetchAllRows("ocorrencia_options", "sort_order"),
+  ]);
+
+  rawHierarchy = { sections, states, properties, costCenters, auditFields };
   rebuildTreeFromCache();
 
   state.ocorrenciaOptions = {};
-  for (const row of ocorrenciaOptions.data) {
+  for (const row of ocorrenciaOptionsRows) {
     (state.ocorrenciaOptions[row.field_key] ||= []).push(row.value);
   }
 
-  const statusRes = await sb.from("audit_status").select("*").eq("year", YEAR);
-  if (statusRes.error) throw statusRes.error;
-  state.cells = buildCells(statusRes.data);
+  state.cells = buildCells(await fetchAllRows("audit_status", "id", (q) => q.eq("year", YEAR)));
 }
 
 async function addOcorrenciaOption(fieldKey, value) {
