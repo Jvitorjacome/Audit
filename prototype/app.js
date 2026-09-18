@@ -386,10 +386,39 @@ function monthCellsFragment(node, months) {
     const td = document.createElement("td");
     td.className = "cell-month";
     const { tone, label } = cellAggregateTone(node.id, m.key);
+
+    const inner = document.createElement("span");
+    inner.className = "cell-month-inner";
     const badge = document.createElement("span");
     badge.className = `status-badge status-badge-${tone}`;
     badge.textContent = label;
-    td.appendChild(badge);
+    inner.appendChild(badge);
+
+    if (isAdmin) {
+      // Apagar é sempre uma ação de UM mês só: cada célula tem seu próprio
+      // ×, que limpa só aquele campo naquele mês — nunca a linha inteira.
+      const cellClearBtn = document.createElement("button");
+      cellClearBtn.type = "button";
+      cellClearBtn.className = "cell-clear";
+      cellClearBtn.title = `Apagar dados de "${node.name}" em ${m.label}`;
+      cellClearBtn.textContent = "×";
+      cellClearBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        if (!confirm(`Apagar os dados de "${node.name}" em ${m.label}? Isso não afeta outros meses. Essa ação não pode ser desfeita.`)) return;
+        cellClearBtn.disabled = true;
+        try {
+          await clearCell(node.id, m.key);
+          renderTreeTable();
+          renderSummary();
+        } catch (err) {
+          alert("Não foi possível apagar: " + describeError(err));
+          cellClearBtn.disabled = false;
+        }
+      });
+      inner.appendChild(cellClearBtn);
+    }
+
+    td.appendChild(inner);
     td.title = cellDetailTitle(node.id, m.key);
     if (tone === "div") td.classList.add("cell-tone-div");
     if (tone === "hidden") td.classList.add("cell-month-hidden");
@@ -608,34 +637,11 @@ function renderTreeTable() {
       });
       tdActions.appendChild(toggleBtn);
     }
-    if (kind === "campo" && isAdmin) {
-      // Pra um campo, "×" nunca apaga o campo em si (isso levaria junto o
-      // histórico de TODOS os meses pra sempre) — limpa só os dados dos
-      // meses que estão visíveis na tela agora. Pra aposentar o campo de
-      // vez, use ocultar (🗕); pra ocultar só um mês, ocultar a célula.
-      const delBtn = document.createElement("button");
-      delBtn.type = "button";
-      delBtn.className = "row-delete";
-      delBtn.title = "Apagar os dados deste campo nos meses visíveis na tela";
-      delBtn.textContent = "×";
-      delBtn.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        const targetMonths = months;
-        if (!targetMonths.length) return;
-        const monthLabels = targetMonths.map((m) => m.label).join(", ");
-        if (!confirm(`Apagar os dados de "${node.name}" em ${monthLabels}? Isso não afeta outros meses. Essa ação não pode ser desfeita.`)) return;
-        delBtn.disabled = true;
-        try {
-          for (const m of targetMonths) await clearCell(node.id, m.key);
-          renderTreeTable();
-          renderSummary();
-        } catch (err) {
-          alert("Não foi possível apagar: " + describeError(err, "structure"));
-          delBtn.disabled = false;
-        }
-      });
-      tdActions.appendChild(delBtn);
-    } else if (kind !== "section" && parentArray && isAdmin) {
+    // Campo não tem × de "apagar" na linha: apagar dados é uma ação de MÊS
+    // (o × dentro de cada célula, em monthCellsFragment), nunca do campo
+    // inteiro de uma vez. Pra aposentar o campo em todos os meses, use
+    // ocultar (🗕).
+    if (kind !== "campo" && kind !== "section" && parentArray && isAdmin) {
       const delBtn = document.createElement("button");
       delBtn.type = "button";
       delBtn.className = "row-delete";

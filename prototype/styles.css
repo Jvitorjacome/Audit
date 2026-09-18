@@ -396,6 +396,22 @@ thead .col-account { background: var(--surface-2); z-index: 2; }
 .status-badge-unv { background: var(--unv-bg); color: var(--unv-fg); }
 .status-badge-hidden { background: transparent; border: 1px dashed var(--border); color: var(--text-muted); font-style: italic; }
 
+.cell-month-inner { display: inline-flex; align-items: center; gap: 4px; }
+.cell-clear {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 4px;
+  width: 16px;
+  height: 16px;
+  line-height: 1;
+  font-size: 0.72rem;
+  cursor: pointer;
+  opacity: 0.55;
+}
+.cell-clear:hover { opacity: 1; color: var(--div-fg); background: var(--div-bg); }
+
 .cell-month-hidden { cursor: pointer; }
 
 .month-hide-toggle {

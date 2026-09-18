@@ -84,9 +84,10 @@ Em **qualquer linha** da árvore (para quem tem papel `admin`):
 - **+** adiciona um item novo dentro dela — num Estado, adiciona uma Propriedade; numa
   Propriedade, um Centro de custo; num Centro de custo, um Campo.
 - **×** remove o item (com confirmação; se ele tiver itens dentro, o aviso mostra quantos
-  serão removidos junto — o banco também aplica isso via `on delete cascade`). **Exceção: num
-  campo auditado**, o **×** nunca apaga o campo em si nem seu histórico inteiro — ele só limpa
-  os dados dos **meses que estão visíveis na tela no momento** (ver "Ações por mês" abaixo).
+  serão removidos junto — o banco também aplica isso via `on delete cascade`). **Exceção: o
+  campo auditado não tem esse × na linha** — ele nunca é apagado (nem o campo, nem seu
+  histórico) por uma ação de linha; apagar dados de um campo é sempre uma ação de **um mês só**
+  (ver "Ações por mês" abaixo).
 
 Isso cobre o caso de auditoria real: uma propriedade nova entra na empresa → adiciona o Estado
 (se ainda não existir) → adiciona a Propriedade → adiciona os Centros de custo → adiciona os
@@ -125,18 +126,19 @@ conseguir achar e reativar algum se precisar.
 
 ## Ações por mês: apagar, editar e ocultar valem só pro mês, não pro campo inteiro
 
-Um campo auditado é uma linha só na árvore, mas cada mês é uma coluna com seus próprios dados —
-então apagar, editar ou ocultar **um mês** nunca deveria afetar os outros. É assim que cada ação
-funciona:
+Isso vale só pro **campo auditado** (o nível dentro do centro de custo que de fato recebe
+status mês a mês) — Estado, Propriedade e Centro de custo continuam com **+**/**×** normais na
+linha, sem noção de mês. Um campo é uma linha só na árvore, mas cada mês é uma coluna com seus
+próprios dados — então apagar, editar ou ocultar **um mês** nunca afeta os outros, nem depende
+de quais meses estão marcados no filtro do topo. Cada célula de mês tem sua própria ação:
 
-- **Editar** — clicar no selo de status de um mês específico (ex.: a célula de Junho) abre o
-  painel lateral já naquele mês, não sempre no primeiro mês visível da linha. O seletor "Mês" no
-  topo do painel deixa trocar pra outro mês sem fechar e reabrir.
-- **Apagar** — o **×** no fim da linha de um campo **não apaga o campo nem seu histórico
-  inteiro**. Ele limpa (volta pra "Não verificado"/vazio) só os dados dos meses que estão
-  **visíveis na tela no momento** — filtre pros meses que quer antes de clicar, se quiser atingir
-  só um. Pra limpar um único mês específico sem depender do filtro de meses visíveis, abra o
-  painel daquele mês e use "Limpar tudo deste mês".
+- **Editar** — clicar no selo de status de uma célula (ex.: a célula de Junho) abre o painel
+  lateral já naquele mês, não sempre no primeiro mês visível da linha. O seletor "Mês" no topo do
+  painel deixa trocar pra outro mês sem fechar e reabrir.
+- **Apagar** — cada célula de mês tem seu próprio **×** pequeno, do lado do selo de status (só
+  pra `admin`). Clicar limpa (volta pra "Não verificado"/vazio) só aquele campo, naquele mês —
+  nunca outro mês, nunca o campo inteiro, nunca o histórico dele. Dentro do painel lateral,
+  "Limpar tudo deste mês" faz a mesma coisa pro mês que estiver aberto ali.
 - **Ocultar** — além do 🗕 que oculta o campo inteiro (todos os meses, ver seção acima), o painel
   lateral tem um checkbox **"Ocultar [campo] em [mês]"** que oculta só aquele mês específico: a
   célula daquele mês vira um selo tracejado "Oculto" (não conta pra % verificado, pra não
