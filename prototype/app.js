@@ -143,6 +143,23 @@ async function persistCellField(auditFieldId, monthKey, uiFieldKey, uiValue) {
   state.cells[key] = { ...getCell(auditFieldId, monthKey), [uiFieldKey]: uiValue };
 }
 
+async function clearCell(auditFieldId, monthKey) {
+  const month = MONTHS.find((m) => m.key === monthKey).number;
+  const payload = { audit_field_id: auditFieldId, year: YEAR, month, updated_by: currentUser.id };
+  for (const f of STATUS_FIELDS) payload[f.column] = "nao_verificado";
+  for (const f of OCORRENCIA_FIELDS) payload[f.column] = null;
+  payload.valor_base_target = null;
+  payload.observacoes = null;
+
+  const { error } = await sb.from("audit_status").upsert(payload, { onConflict: "audit_field_id,year,month" });
+  if (error) throw error;
+
+  const cell = { valorBaseTarget: "", observacoes: "" };
+  for (const f of STATUS_FIELDS) cell[f.key] = "Não verificado";
+  for (const f of OCORRENCIA_FIELDS) cell[f.key] = "";
+  state.cells[cellKey(auditFieldId, monthKey)] = cell;
+}
+
 function countLeaves(node, kind) {
   if (kind === "campo") return 1;
   const kids = childrenOf(node, kind);
@@ -700,11 +717,36 @@ function openDrawer(node, month, kindLabel) {
 
   const fieldsEl = document.getElementById("drawerFields");
   fieldsEl.innerHTML = "";
+
+  const clearAllBtn = document.createElement("button");
+  clearAllBtn.type = "button";
+  clearAllBtn.className = "btn btn-clear-all";
+  clearAllBtn.textContent = "Limpar tudo deste mês";
+  clearAllBtn.addEventListener("click", async () => {
+    if (!confirm(`Limpar todos os campos de auditoria de "${node.name}" em ${useMonth.label}? Essa ação não pode ser desfeita.`)) return;
+    clearAllBtn.disabled = true;
+    setSaving("saving");
+    try {
+      await clearCell(drawerCtx.id, drawerCtx.monthKey);
+      setSaving("saved");
+      openDrawer(node, useMonth, kindLabel);
+      renderTreeTable();
+      renderSummary();
+    } catch (err) {
+      setSaving("error");
+      alert("Não foi possível limpar: " + describeError(err));
+      clearAllBtn.disabled = false;
+    }
+  });
+  fieldsEl.appendChild(clearAllBtn);
+
   for (const f of STATUS_FIELDS) {
     const wrap = document.createElement("label");
     wrap.className = "field";
     const value = cell[f.key] || "Não verificado";
     wrap.innerHTML = `<span class="field-label">${f.label}</span>`;
+    const row = document.createElement("span");
+    row.className = "field-row";
     const select = document.createElement("select");
     select.className = `select select-${statusTone(value)}`;
     for (const opt of STATUS_OPTIONS) {
@@ -727,7 +769,28 @@ function openDrawer(node, month, kindLabel) {
         alert("Não foi possível salvar: " + describeError(err));
       }
     });
-    wrap.appendChild(select);
+    const clearBtn = document.createElement("button");
+    clearBtn.type = "button";
+    clearBtn.className = "field-clear";
+    clearBtn.title = `Limpar "${f.label}" (volta pra Não verificado)`;
+    clearBtn.textContent = "×";
+    clearBtn.addEventListener("click", async () => {
+      setSaving("saving");
+      try {
+        await persistCellField(drawerCtx.id, drawerCtx.monthKey, f.key, "Não verificado");
+        select.value = "Não verificado";
+        select.className = "select select-unv";
+        setSaving("saved");
+        renderTreeTable();
+        renderSummary();
+      } catch (err) {
+        setSaving("error");
+        alert("Não foi possível limpar: " + describeError(err));
+      }
+    });
+    row.appendChild(select);
+    row.appendChild(clearBtn);
+    wrap.appendChild(row);
     fieldsEl.appendChild(wrap);
   }
 
@@ -746,6 +809,8 @@ function openDrawer(node, month, kindLabel) {
     wrap.className = "field";
     const value = cell[f.key] || "";
     wrap.innerHTML = `<span class="field-label">${f.label}</span>`;
+    const row = document.createElement("span");
+    row.className = "field-row";
     const select = document.createElement("select");
     select.className = "select";
     const blankOpt = document.createElement("option");
@@ -797,7 +862,26 @@ function openDrawer(node, month, kindLabel) {
         alert("Não foi possível salvar: " + describeError(err));
       }
     });
-    wrap.appendChild(select);
+    const clearBtn = document.createElement("button");
+    clearBtn.type = "button";
+    clearBtn.className = "field-clear";
+    clearBtn.title = `Limpar "${f.label}"`;
+    clearBtn.textContent = "×";
+    clearBtn.addEventListener("click", async () => {
+      if (!value) return;
+      setSaving("saving");
+      try {
+        await persistCellField(drawerCtx.id, drawerCtx.monthKey, f.key, "");
+        setSaving("saved");
+        openDrawer(node, useMonth, kindLabel);
+      } catch (err) {
+        setSaving("error");
+        alert("Não foi possível limpar: " + describeError(err));
+      }
+    });
+    row.appendChild(select);
+    row.appendChild(clearBtn);
+    wrap.appendChild(row);
     fieldsEl.appendChild(wrap);
   }
 

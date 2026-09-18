@@ -43,37 +43,49 @@
     </div>
   </header>
 
+  <nav class="tab-bar" id="tabBar">
+    <button class="tab-btn tab-btn-active" id="tabBtnAuditoria" type="button">Auditoria</button>
+    <button class="tab-btn" id="tabBtnIndicadores" type="button">Indicadores</button>
+  </nav>
+
   <div class="notice" id="loadError" hidden></div>
 
-  <div class="legend">
-    <span class="legend-item"><span class="status-badge status-badge-ok">Conforme</span></span>
-    <span class="legend-item"><span class="status-badge status-badge-div">Não conforme</span></span>
-    <span class="legend-item"><span class="status-badge status-badge-unv">Pendente</span></span>
-    <span class="legend-item"><span class="legend-dot"></span> Barra = % verificado (Estado, Propriedade, Centro de custo)</span>
-  </div>
-
-  <div class="toolbar">
-    <div class="month-filter" id="monthFilter"></div>
-    <div class="btn-row">
-      <button class="btn" id="btnOriginalMonths" type="button">Só meses da planilha original</button>
-      <button class="btn" id="btnAllMonths" type="button">Mostrar ano inteiro</button>
-      <button class="btn" id="btnToggleHidden" type="button" hidden>Mostrar campos ocultos</button>
-      <button class="btn" id="btnRefresh" type="button">Atualizar dados</button>
+  <div id="tabAuditoria">
+    <div class="legend">
+      <span class="legend-item"><span class="status-badge status-badge-ok">Conforme</span></span>
+      <span class="legend-item"><span class="status-badge status-badge-div">Não conforme</span></span>
+      <span class="legend-item"><span class="status-badge status-badge-unv">Pendente</span></span>
+      <span class="legend-item"><span class="legend-dot"></span> Barra = % verificado (Estado, Propriedade, Centro de custo)</span>
     </div>
+
+    <div class="toolbar">
+      <div class="month-filter" id="monthFilter"></div>
+      <div class="btn-row">
+        <button class="btn" id="btnOriginalMonths" type="button">Só meses da planilha original</button>
+        <button class="btn" id="btnAllMonths" type="button">Mostrar ano inteiro</button>
+        <button class="btn" id="btnToggleHidden" type="button" hidden>Mostrar campos ocultos</button>
+        <button class="btn" id="btnRefresh" type="button">Atualizar dados</button>
+      </div>
+    </div>
+
+    <div class="summary" id="summary"></div>
+
+    <div class="table-scroll" id="treeWrap"></div>
+
+    <p class="footer-note">
+      Só o <strong>campo auditado</strong> tem os 5 status — clique nele para abrir o painel (passe o mouse sobre o
+      selo da célula pra ver o detalhe dos 5 indicadores). Estado, propriedade e centro de custo mostram, no lugar
+      disso, uma barra com o quanto dos campos abaixo deles já foi verificado, com aviso em vermelho só quando há
+      algum não conforme. Use ▾/▸ para recolher/expandir. Administradores também veem <strong>+</strong> em qualquer
+      linha para adicionar um item novo dentro dela (estado numa seção, propriedade num estado, centro de custo numa
+      propriedade, ou campo num centro de custo), e <strong>×</strong> para remover.
+    </p>
   </div>
 
-  <div class="summary" id="summary"></div>
-
-  <div class="table-scroll" id="treeWrap"></div>
-
-  <p class="footer-note">
-    Só o <strong>campo auditado</strong> tem os 5 status — clique nele para abrir o painel (passe o mouse sobre o
-    selo da célula pra ver o detalhe dos 5 indicadores). Estado, propriedade e centro de custo mostram, no lugar
-    disso, uma barra com o quanto dos campos abaixo deles já foi verificado, com aviso em vermelho só quando há
-    algum não conforme. Use ▾/▸ para recolher/expandir. Administradores também veem <strong>+</strong> em qualquer
-    linha para adicionar um item novo dentro dela (estado numa seção, propriedade num estado, centro de custo numa
-    propriedade, ou campo num centro de custo), e <strong>×</strong> para remover.
-  </p>
+  <div id="tabIndicadores" hidden>
+    <div class="dash-filters" id="dashFilters"></div>
+    <div id="dashBody"></div>
+  </div>
 </div>
 
 <div class="backdrop" id="drawerBackdrop"></div>
@@ -109,8 +121,10 @@
 </aside>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script src="supabaseClient.js"></script>
 <script src="config.js"></script>
 <script src="app.js"></script>
+<script src="dashboard.js"></script>
 </body>
 </html>

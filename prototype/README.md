@@ -32,7 +32,8 @@ só aparece quando há de fato uma divergência a sinalizar.
 
 ## Arquivos
 
-- **`index.html` / `styles.css`** — layout, tela de login e a grade de auditoria.
+- **`index.html` / `styles.css`** — layout, tela de login, as duas abas (Auditoria/Indicadores)
+  e a grade de auditoria.
 - **`supabaseClient.js`** — URL e chave pública do projeto Supabase; cria o cliente `sb`
   usado no resto do app.
 - **`config.js`** — configuração estática (meses, os 5 indicadores, opções de status) e os
@@ -40,6 +41,8 @@ só aparece quando há de fato uma divergência a sinalizar.
 - **`app.js`** — autenticação, carregamento da árvore + status a partir do Supabase,
   renderização da tabela/resumo/painel lateral, e todas as escritas (status, adicionar/remover
   itens da hierarquia).
+- **`dashboard.js`** — a aba **Indicadores**: agrega os dados já carregados pelo `app.js` em
+  KPIs e gráficos (ver seção própria abaixo).
 - **`data.js`** — **não é mais carregado pelo app.** É o artefato histórico gerado a partir da
   exportação real da aba DRE, usado uma única vez para popular `db/seed.sql` (ver
   `db/README.md`). Mantido no repositório só como registro de proveniência dos dados.
@@ -123,6 +126,37 @@ adicionar uma nova direto pelo dropdown: escolha **"+ Adicionar novo..."** no fi
 digite o valor novo, e ele já fica salvo e selecionado na hora — nenhuma outra pessoa que abrir o
 sistema depois precisa reconfigurar nada. Serve pra quando entra funcionário novo, aparece um tipo
 de ocorrência que ainda não existia, etc.
+
+### Limpar campos
+
+No painel de um campo, cada um dos 5 indicadores e dos 4 campos de ocorrência tem um **×** ao
+lado que limpa só aquele campo (volta pra "Não verificado" ou vazio). O botão **"Limpar tudo
+deste mês"** no topo do painel zera de uma vez todos os indicadores, a ocorrência, o valor
+base/target e as observações daquele campo naquele mês — pede confirmação antes, porque não dá
+pra desfazer.
+
+## Aba Indicadores
+
+O sistema agora tem duas abas: **Auditoria** (a árvore de sempre) e **Indicadores** — um
+dashboard com KPIs e gráficos, inspirado no projeto "Audit Insights Hub" (Lovable) que o
+administrador já usava, mas lendo os dados direto deste banco (não da planilha do Google Sheets).
+Filtra por mês e propriedade, e mostra:
+
+- Total analisado, não conformidades, taxa de conformidade, impacto financeiro.
+- Impacto financeiro detalhado: QAVI vs proprietário, corrigido vs não corrigido (a
+  classificação QAVI/proprietário usa as mesmas palavras-chave do dashboard original —
+  ocorrências como "não lançado" ou "valor menor que o target" contam como impacto QAVI, o
+  resto como impacto do proprietário).
+- Erros por setor responsável, por funcionário responsável e por propriedade.
+- Conformidade por mês (cards + gráfico).
+- Ocorrências por tipo, com quantidade e valor total (tabela + gráfico).
+
+Uma diferença de propósito em relação ao original: lá, o gráfico de "Ocorrências por tipo" era
+um donut (pizza). Aqui virou barra — com até 16 tipos possíveis, uma pizza de tantas fatias fica
+difícil de ler; a régua de design usada (skill de dataviz) recomenda no máximo ~6 fatias para
+esse tipo de gráfico antes de trocar por barra.
+
+Os gráficos usam [Chart.js](https://www.chartjs.org/) (carregado via CDN, sem precisar de build).
 
 ## Limitações conhecidas
 
