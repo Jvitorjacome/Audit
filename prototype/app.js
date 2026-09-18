@@ -668,6 +668,7 @@ function showAppScreen() {
   appScreenEl.hidden = false;
 }
 function showLoadError(err) {
+  console.error("Falha ao carregar dados do Supabase:", err);
   loadErrorEl.hidden = false;
   loadErrorEl.textContent = "Não foi possível carregar os dados: " + describeError(err) + " — clique em \"Atualizar dados\" para tentar de novo.";
 }
@@ -700,18 +701,32 @@ async function onSignedIn(session) {
   }
 }
 
+function translateAuthError(err) {
+  const msg = (err && err.message) || String(err || "");
+  if (/invalid login credentials/i.test(msg)) return "E-mail ou senha inválidos.";
+  if (/email not confirmed/i.test(msg)) return "E-mail ainda não confirmado — peça para o administrador confirmar seu cadastro em Authentication → Users no painel Supabase.";
+  return msg || "Não foi possível entrar. Tente novamente.";
+}
+
 let handledUserId = null;
-sb.auth.onAuthStateChange((event, session) => {
-  if (event === "SIGNED_OUT" || !session) {
-    handledUserId = null;
-    showAuthScreen();
-    return;
-  }
-  if ((event === "INITIAL_SESSION" || event === "SIGNED_IN") && handledUserId !== session.user.id) {
-    handledUserId = session.user.id;
-    onSignedIn(session);
-  }
-});
+if (sb) {
+  sb.auth.onAuthStateChange((event, session) => {
+    if (event === "SIGNED_OUT" || !session) {
+      handledUserId = null;
+      showAuthScreen();
+      return;
+    }
+    if ((event === "INITIAL_SESSION" || event === "SIGNED_IN") && handledUserId !== session.user.id) {
+      handledUserId = session.user.id;
+      onSignedIn(session);
+    }
+  });
+} else {
+  showAuthScreen();
+  const errEl = document.getElementById("authError");
+  errEl.textContent = "Não foi possível conectar ao Supabase: " + translateAuthError(SUPABASE_INIT_ERROR) + " Recarregue a página; se persistir, avise o administrador.";
+  errEl.hidden = false;
+}
 
 document.getElementById("loginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -720,14 +735,25 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
   const errEl = document.getElementById("authError");
   const submitBtn = document.getElementById("loginSubmit");
   errEl.hidden = true;
+  if (!sb) {
+    errEl.textContent = "Não foi possível conectar ao Supabase. Recarregue a página e tente de novo.";
+    errEl.hidden = false;
+    return;
+  }
   submitBtn.disabled = true;
   submitBtn.textContent = "Entrando…";
-  const { error } = await sb.auth.signInWithPassword({ email, password });
-  submitBtn.disabled = false;
-  submitBtn.textContent = "Entrar";
-  if (error) {
-    errEl.textContent = "E-mail ou senha inválidos.";
+  try {
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) {
+      errEl.textContent = translateAuthError(error);
+      errEl.hidden = false;
+    }
+  } catch (err) {
+    errEl.textContent = "Não foi possível conectar ao servidor: " + ((err && err.message) || String(err));
     errEl.hidden = false;
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Entrar";
   }
 });
 
