@@ -708,17 +708,38 @@ function translateAuthError(err) {
   return msg || "Não foi possível entrar. Tente novamente.";
 }
 
+// A GoTrueClient dispara "INITIAL_SESSION" uma vez ao carregar (lendo o
+// localStorage de forma assíncrona) e depois "SIGNED_IN"/"SIGNED_OUT" conforme
+// o usuário interage. Em alguns navegadores essa checagem inicial demora mais
+// que um login manual e o evento (às vezes um "INITIAL_SESSION" atrasado, às
+// vezes um evento sem sessão) chega DEPOIS do "SIGNED_IN" que acabamos de
+// processar — sem essa proteção, isso derruba o usuário de volta pra tela de
+// login um instante depois de logar com sucesso. Por isso só tratamos
+// "SIGNED_OUT" explícito como sinal de logout; qualquer evento sem sessão que
+// chegue depois de já estarmos autenticados é ignorado.
 let handledUserId = null;
+let initialSessionSeen = false;
 if (sb) {
   sb.auth.onAuthStateChange((event, session) => {
-    if (event === "SIGNED_OUT" || !session) {
+    console.log("[auth]", event, session ? session.user.id : null);
+    if (event === "INITIAL_SESSION") {
+      if (initialSessionSeen) return; // ignora repetições/atrasos do evento inicial
+      initialSessionSeen = true;
+    }
+    if (event === "SIGNED_OUT") {
       handledUserId = null;
       showAuthScreen();
       return;
     }
-    if ((event === "INITIAL_SESSION" || event === "SIGNED_IN") && handledUserId !== session.user.id) {
-      handledUserId = session.user.id;
-      onSignedIn(session);
+    if (session && session.user) {
+      if (handledUserId !== session.user.id) {
+        handledUserId = session.user.id;
+        onSignedIn(session);
+      }
+      return;
+    }
+    if (!handledUserId) {
+      showAuthScreen();
     }
   });
 } else {

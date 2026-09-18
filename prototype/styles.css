@@ -63,6 +63,12 @@
 
 * { box-sizing: border-box; }
 
+/* `.auth-screen`/`.wrap` set their own `display`, que empataria em
+   especificidade com a regra padrão do navegador para `[hidden]` e, pelo
+   critério de ordem de cascata, venceria — deixando a tela "escondida"
+   visível por cima da outra. Força `hidden` a sempre esconder de verdade. */
+[hidden] { display: none !important; }
+
 body {
   background: var(--bg);
   color: var(--text);
