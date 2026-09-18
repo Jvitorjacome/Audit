@@ -172,7 +172,8 @@ begin
   return new;
 end;
 $$ language plpgsql
-set search_path = public, pg_temp; -- linter de segurança: search_path fixo
+security definer -- só o gatilho grava no histórico, independente da RLS de quem editou
+set search_path = public, pg_temp; -- pinado por segurança (obrigatório com security definer)
 
 create trigger trg_audit_status_history
   after update on audit_status

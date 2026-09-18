@@ -1,0 +1,22 @@
+-- ============================================================================
+-- Migração 003 — QAVI Auditoria
+-- Corrige um bug real do schema original: audit_status_history tinha RLS
+-- ativado mas nenhuma política de INSERT, então o gatilho que grava a trilha
+-- de auditoria (log_audit_status_change) falhava silenciosamente e derrubava
+-- a atualização inteira toda vez que alguém editava um status que já tinha
+-- valor antes (a 1ª edição de uma célula sempre foi um INSERT, então só
+-- aparecia a partir da 2ª edição em diante — por isso passou despercebido
+-- nos testes iniciais).
+--
+-- Correção: a função do gatilho passa a rodar como SECURITY DEFINER (com os
+-- privilégios de quem criou a função, não de quem está logado), então ela
+-- sempre consegue gravar no histórico, independente da RLS do usuário. Em
+-- contrapartida, audit_status_history continua sem NENHUMA política de
+-- INSERT/UPDATE/DELETE para usuários comuns — só o gatilho grava ali, então
+-- ninguém (nem admin) consegue forjar ou apagar a trilha de auditoria
+-- manualmente. Isso é mais seguro do que simplesmente abrir INSERT pra
+-- "authenticated", que deixaria qualquer usuário logado inserir linhas falsas
+-- de histórico direto pela API.
+-- ============================================================================
+
+alter function log_audit_status_change() security definer;

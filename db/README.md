@@ -19,13 +19,19 @@ projeto Supabase de produção da QAVI** ("Auditoria - Qavi", projeto
   contém o resultado de todas elas — só use a pasta `migrations/` se estiver
   aplicando em um projeto que já rodava uma versão anterior do schema.
 
-### ⚠️ Pendente: `migrations/002_hide_fields_and_ocorrencia_tracking.sql`
+### ⚠️ Pendente: `migrations/003_fix_audit_history_trigger_rls.sql`
 
-Ainda não foi aplicada no banco de produção (o conector do Supabase estava fora
-do ar quando essa mudança foi feita). **Precisa colar o conteúdo desse arquivo no
-SQL Editor do painel Supabase e rodar** antes do app conseguir usar ocultar/mostrar
-campo, renomear campo, e os 4 novos campos de ocorrência (tipo, corrigido, setor e
-funcionário responsáveis). Sem isso, essas ações vão dar erro de coluna inexistente.
+Ainda não foi aplicada. Corrige um bug real do schema original: `audit_status_history`
+tinha RLS ativado sem nenhuma política de INSERT, então o gatilho de trilha de
+auditoria falhava e derrubava a atualização inteira sempre que alguém editava (não
+criava pela 1ª vez) um status — inclusive um admin. **Precisa rodar essa migração**
+pra conseguir editar um status pela segunda vez em diante.
+
+### `migrations/002_hide_fields_and_ocorrencia_tracking.sql`
+
+Já aplicada em produção (colada manualmente no SQL Editor). Adicionou ocultar/mostrar
+campo, renomear campo, e os 4 campos de ocorrência (tipo, corrigido, setor e
+funcionário responsáveis).
 
 ## Status atual: já aplicado em produção
 
