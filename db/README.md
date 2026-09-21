@@ -19,6 +19,18 @@ projeto Supabase de produção da QAVI** ("Auditoria - Qavi", projeto
   contém o resultado de todas elas — só use a pasta `migrations/` se estiver
   aplicando em um projeto que já rodava uma versão anterior do schema.
 
+### `migrations/008_leitor_role_readonly.sql`
+
+Já aplicada. Novo papel `leitor`: lê tudo (a árvore inteira, status, contas
+variáveis, dashboard), mas nunca escreve em nada. Antes só existiam `admin`
+(estrutura + dado) e `auditor` (só dado, sem estrutura) — as políticas de RLS de
+escrita em `audit_status` e `variable_entries` eram abertas pra qualquer
+autenticado. Essa migração restringe essas políticas a `role in ('admin',
+'auditor')`, excluindo `leitor`. Políticas de leitura (`"authenticated read"`, em
+todas as tabelas) não mudaram — `leitor` continua com acesso de leitura total. As
+políticas de estrutura (sections/states/properties/cost_centers/audit_fields) já
+eram admin-only desde antes, não afetadas por essa migração.
+
 ### `migrations/007_variable_entries.sql`
 
 Já aplicada. Tabela nova `variable_entries` (+ `variable_entries_history`, com o mesmo padrão de
@@ -155,9 +167,14 @@ mudanças de estrutura) — não usa mais `localStorage` como fonte de dados. Ve
 
 O primeiro usuário admin já está cadastrado: `joaogalvao@quartoavista.com.br`
 (perfil `profiles` com `role='admin'`, id `081f9cc8-19f8-4fcf-94e3-c45b342ac614`).
-Para dar acesso a mais auditores, crie o usuário em **Authentication → Users** no
-painel Supabase e rode o `insert into profiles (...)` acima com `role='auditor'`
-(ou `'admin'` se a pessoa também for mexer na estrutura da árvore).
+Para dar acesso a mais pessoas, crie o usuário em **Authentication → Users** no
+painel Supabase e rode o `insert into profiles (...)` acima com o `role` certo:
+- `'admin'` — mexe na estrutura da árvore (seções/estados/propriedades/centros/campos)
+  e edita status/contas variáveis.
+- `'auditor'` — só edita status e contas variáveis, sem mexer na estrutura.
+- `'leitor'` — só leitura, em tudo (árvore, status, contas variáveis, dashboard);
+  não escreve nada (RLS bloqueia no banco, e a interface já esconde os controles
+  de edição pra esse papel).
 
 ## Próximos passos possíveis
 

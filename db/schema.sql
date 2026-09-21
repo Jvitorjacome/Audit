@@ -28,13 +28,15 @@ create type audit_status_value as enum (
 
 -- ----------------------------------------------------------------------------
 -- Quem audita: estende auth.users (gerenciado pelo Supabase Auth) com papel.
--- 'admin' pode reestruturar a árvore (criar/remover propriedade, estado...);
--- 'auditor' só edita status dos campos. Ajuste os papéis conforme a equipe.
+-- 'admin' pode reestruturar a árvore (criar/remover propriedade, estado...) E
+-- editar status/contas variáveis; 'auditor' só edita status/contas variáveis
+-- (sem mexer na estrutura); 'leitor' só lê — nunca escreve nada, em nenhuma
+-- tabela. Ajuste os papéis conforme a equipe.
 -- ----------------------------------------------------------------------------
 create table profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   full_name text not null,
-  role text not null default 'auditor' check (role in ('admin', 'auditor')),
+  role text not null default 'auditor' check (role in ('admin', 'auditor', 'leitor')),
   created_at timestamptz not null default now()
 );
 
@@ -371,16 +373,26 @@ create policy "authenticated read" on ocorrencia_options for select using (auth.
 create policy "authenticated read" on variable_entries for select using (auth.role() = 'authenticated');
 create policy "authenticated read" on variable_entries_history for select using (auth.role() = 'authenticated');
 
--- Status: qualquer auditor autenticado pode editar (é o trabalho dele)
-create policy "authenticated write status" on audit_status for insert with check (auth.role() = 'authenticated');
-create policy "authenticated update status" on audit_status for update using (auth.role() = 'authenticated');
+-- Status: admin e auditor editam (é o trabalho deles) — leitor nunca, só lê
+-- (a política de select acima já cobre leitura pra qualquer autenticado,
+-- leitor incluso; aqui é só escrita).
+create policy "editors write status" on audit_status for insert with check (
+  exists (select 1 from profiles where id = auth.uid() and role in ('admin', 'auditor'))
+);
+create policy "editors update status" on audit_status for update using (
+  exists (select 1 from profiles where id = auth.uid() and role in ('admin', 'auditor'))
+);
 
--- Contas variáveis: criar/editar/renomear/apagar é trabalho de auditoria do
--- dia a dia (não é "estrutura" no sentido de sections/states/.../audit_fields),
--- então qualquer autenticado pode — igual ao status dos campos fixos.
-create policy "authenticated write variable_entries" on variable_entries for insert with check (auth.role() = 'authenticated');
-create policy "authenticated update variable_entries" on variable_entries for update using (auth.role() = 'authenticated');
-create policy "authenticated delete variable_entries" on variable_entries for delete using (auth.role() = 'authenticated');
+-- Contas variáveis: mesma regra — admin/auditor editam, leitor só lê.
+create policy "editors write variable_entries" on variable_entries for insert with check (
+  exists (select 1 from profiles where id = auth.uid() and role in ('admin', 'auditor'))
+);
+create policy "editors update variable_entries" on variable_entries for update using (
+  exists (select 1 from profiles where id = auth.uid() and role in ('admin', 'auditor'))
+);
+create policy "editors delete variable_entries" on variable_entries for delete using (
+  exists (select 1 from profiles where id = auth.uid() and role in ('admin', 'auditor'))
+);
 
 -- Estrutura (adicionar/remover estado, propriedade, centro, campo): só admin
 create policy "admin write sections" on sections for all using (

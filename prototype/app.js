@@ -135,6 +135,10 @@ let state = {
 let currentUser = null;
 let currentProfile = null;
 let isAdmin = false;
+// Leitor lê tudo, mas nunca escreve nada (nem status, nem contas variáveis)
+// — RLS já garante isso no banco; canEdit espelha a mesma regra na UI, pra
+// nem mostrar os controles de edição pra quem não pode usá-los.
+let canEdit = false;
 
 // ---------- cells (status mensal, agora vindos do Supabase) ----------
 
@@ -520,9 +524,10 @@ function monthCellsFragment(node, months) {
     badge.textContent = label;
     inner.appendChild(badge);
 
-    if (isAdmin) {
+    if (canEdit) {
       // Apagar é sempre uma ação de UM mês só: cada célula tem seu próprio
       // ×, que limpa só aquele campo naquele mês — nunca a linha inteira.
+      // canEdit (não isAdmin): auditor também edita status, só leitor não.
       const cellClearBtn = document.createElement("button");
       cellClearBtn.type = "button";
       cellClearBtn.className = "cell-clear";
@@ -714,10 +719,11 @@ function renderTreeTable() {
       });
       tdActions.appendChild(addBtn);
     }
-    if (kind === "centro") {
+    if (kind === "centro" && canEdit) {
       // Conta variável (despesa que não aparece todo mês): não é
       // "estrutura" da árvore (não é admin-only) — é trabalho de auditoria
-      // do dia a dia, igual marcar status, então qualquer autenticado pode.
+      // do dia a dia, igual marcar status, então admin/auditor podem (não
+      // isAdmin — só leitor fica de fora, igual ao resto da edição).
       const addVarBtn = document.createElement("button");
       addVarBtn.type = "button";
       addVarBtn.className = "row-add row-add-variavel";
@@ -891,46 +897,48 @@ function renderTreeTable() {
     const tdActions = document.createElement("td");
     tdActions.className = "col-actions";
 
-    const renameBtn = document.createElement("button");
-    renameBtn.type = "button";
-    renameBtn.className = "row-rename";
-    renameBtn.title = "Renomear conta variável";
-    renameBtn.textContent = "✎";
-    renameBtn.addEventListener("click", async (e) => {
-      e.stopPropagation();
-      const newName = prompt("Novo nome do lançamento:", entry.name);
-      if (!newName || !newName.trim() || newName.trim() === entry.name) return;
-      renameBtn.disabled = true;
-      try {
-        await renameVariableEntry(entry.id, newName.trim());
-        renderTreeTable();
-      } catch (err) {
-        alert("Não foi possível renomear: " + describeError(err));
-      } finally {
-        renameBtn.disabled = false;
-      }
-    });
-    tdActions.appendChild(renameBtn);
+    if (canEdit) {
+      const renameBtn = document.createElement("button");
+      renameBtn.type = "button";
+      renameBtn.className = "row-rename";
+      renameBtn.title = "Renomear conta variável";
+      renameBtn.textContent = "✎";
+      renameBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const newName = prompt("Novo nome do lançamento:", entry.name);
+        if (!newName || !newName.trim() || newName.trim() === entry.name) return;
+        renameBtn.disabled = true;
+        try {
+          await renameVariableEntry(entry.id, newName.trim());
+          renderTreeTable();
+        } catch (err) {
+          alert("Não foi possível renomear: " + describeError(err));
+        } finally {
+          renameBtn.disabled = false;
+        }
+      });
+      tdActions.appendChild(renameBtn);
 
-    const delBtn = document.createElement("button");
-    delBtn.type = "button";
-    delBtn.className = "row-delete";
-    delBtn.title = "Apagar este lançamento variável";
-    delBtn.textContent = "×";
-    delBtn.addEventListener("click", async (e) => {
-      e.stopPropagation();
-      if (!confirm(`Apagar o lançamento "${entry.name}" (${monthLabel} de ${entry.year})? Essa ação não pode ser desfeita.`)) return;
-      delBtn.disabled = true;
-      try {
-        await deleteVariableEntry(entry.id);
-        renderTreeTable();
-        renderSummary();
-      } catch (err) {
-        alert("Não foi possível apagar: " + describeError(err));
-        delBtn.disabled = false;
-      }
-    });
-    tdActions.appendChild(delBtn);
+      const delBtn = document.createElement("button");
+      delBtn.type = "button";
+      delBtn.className = "row-delete";
+      delBtn.title = "Apagar este lançamento variável";
+      delBtn.textContent = "×";
+      delBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        if (!confirm(`Apagar o lançamento "${entry.name}" (${monthLabel} de ${entry.year})? Essa ação não pode ser desfeita.`)) return;
+        delBtn.disabled = true;
+        try {
+          await deleteVariableEntry(entry.id);
+          renderTreeTable();
+          renderSummary();
+        } catch (err) {
+          alert("Não foi possível apagar: " + describeError(err));
+          delBtn.disabled = false;
+        }
+      });
+      tdActions.appendChild(delBtn);
+    }
 
     tr.appendChild(tdActions);
     tbody.appendChild(tr);
@@ -1140,33 +1148,36 @@ function renderDrawerBody(ctx) {
   const fieldsEl = document.getElementById("drawerFields");
   fieldsEl.innerHTML = "";
 
-  const clearAllBtn = document.createElement("button");
-  clearAllBtn.type = "button";
-  clearAllBtn.className = "btn btn-clear-all";
-  clearAllBtn.textContent = ctx.monthPicker ? "Limpar tudo deste mês" : "Limpar tudo";
-  clearAllBtn.addEventListener("click", async () => {
-    if (!confirm(ctx.clearConfirmText)) return;
-    clearAllBtn.disabled = true;
-    setSaving("saving");
-    try {
-      await ctx.clearAll();
-      setSaving("saved");
-      ctx.onReopen();
-      renderTreeTable();
-      renderSummary();
-    } catch (err) {
-      setSaving("error");
-      alert("Não foi possível limpar: " + describeError(err));
-      clearAllBtn.disabled = false;
-    }
-  });
-  fieldsEl.appendChild(clearAllBtn);
+  if (canEdit) {
+    const clearAllBtn = document.createElement("button");
+    clearAllBtn.type = "button";
+    clearAllBtn.className = "btn btn-clear-all";
+    clearAllBtn.textContent = ctx.monthPicker ? "Limpar tudo deste mês" : "Limpar tudo";
+    clearAllBtn.addEventListener("click", async () => {
+      if (!confirm(ctx.clearConfirmText)) return;
+      clearAllBtn.disabled = true;
+      setSaving("saving");
+      try {
+        await ctx.clearAll();
+        setSaving("saved");
+        ctx.onReopen();
+        renderTreeTable();
+        renderSummary();
+      } catch (err) {
+        setSaving("error");
+        alert("Não foi possível limpar: " + describeError(err));
+        clearAllBtn.disabled = false;
+      }
+    });
+    fieldsEl.appendChild(clearAllBtn);
+  }
 
   // Oculta só este campo, só neste mês (diferente do 🗕 da linha, que oculta
   // o campo inteiro em todos os meses) — pra quando ele não se aplica num
   // mês específico, mas continua valendo nos outros. Não existe pra contas
-  // variáveis (ctx.setHidden é null): elas já só existem num mês.
-  if (ctx.setHidden) {
+  // variáveis (ctx.setHidden é null): elas já só existem num mês. Leitor
+  // não vê esse controle (não edita nada).
+  if (ctx.setHidden && canEdit) {
     const hideMonthLabel = document.createElement("label");
     hideMonthLabel.className = "month-hide-toggle";
     const hideMonthCheckbox = document.createElement("input");
@@ -1205,6 +1216,7 @@ function renderDrawerBody(ctx) {
     row.className = "field-row";
     const select = document.createElement("select");
     select.className = `select select-${statusTone(value)}`;
+    select.disabled = !canEdit;
     for (const opt of STATUS_OPTIONS) {
       const o = document.createElement("option");
       o.value = opt;
@@ -1225,27 +1237,29 @@ function renderDrawerBody(ctx) {
         alert("Não foi possível salvar: " + describeError(err));
       }
     });
-    const clearBtn = document.createElement("button");
-    clearBtn.type = "button";
-    clearBtn.className = "field-clear";
-    clearBtn.title = `Limpar "${f.label}" (volta pra Não verificado)`;
-    clearBtn.textContent = "×";
-    clearBtn.addEventListener("click", async () => {
-      setSaving("saving");
-      try {
-        await drawerCtx.persistField(f.key, "Não verificado");
-        select.value = "Não verificado";
-        select.className = "select select-unv";
-        setSaving("saved");
-        renderTreeTable();
-        renderSummary();
-      } catch (err) {
-        setSaving("error");
-        alert("Não foi possível limpar: " + describeError(err));
-      }
-    });
     row.appendChild(select);
-    row.appendChild(clearBtn);
+    if (canEdit) {
+      const clearBtn = document.createElement("button");
+      clearBtn.type = "button";
+      clearBtn.className = "field-clear";
+      clearBtn.title = `Limpar "${f.label}" (volta pra Não verificado)`;
+      clearBtn.textContent = "×";
+      clearBtn.addEventListener("click", async () => {
+        setSaving("saving");
+        try {
+          await drawerCtx.persistField(f.key, "Não verificado");
+          select.value = "Não verificado";
+          select.className = "select select-unv";
+          setSaving("saved");
+          renderTreeTable();
+          renderSummary();
+        } catch (err) {
+          setSaving("error");
+          alert("Não foi possível limpar: " + describeError(err));
+        }
+      });
+      row.appendChild(clearBtn);
+    }
     wrap.appendChild(row);
     fieldsEl.appendChild(wrap);
   }
@@ -1269,6 +1283,7 @@ function renderDrawerBody(ctx) {
     row.className = "field-row";
     const select = document.createElement("select");
     select.className = "select";
+    select.disabled = !canEdit;
     const blankOpt = document.createElement("option");
     blankOpt.value = "";
     blankOpt.textContent = "— selecionar —";
@@ -1318,35 +1333,39 @@ function renderDrawerBody(ctx) {
         alert("Não foi possível salvar: " + describeError(err));
       }
     });
-    const clearBtn = document.createElement("button");
-    clearBtn.type = "button";
-    clearBtn.className = "field-clear";
-    clearBtn.title = `Limpar "${f.label}"`;
-    clearBtn.textContent = "×";
-    clearBtn.addEventListener("click", async () => {
-      if (!value) return;
-      setSaving("saving");
-      try {
-        await drawerCtx.persistField(f.key, "");
-        setSaving("saved");
-        ctx.onReopen();
-      } catch (err) {
-        setSaving("error");
-        alert("Não foi possível limpar: " + describeError(err));
-      }
-    });
     row.appendChild(select);
-    row.appendChild(clearBtn);
+    if (canEdit) {
+      const clearBtn = document.createElement("button");
+      clearBtn.type = "button";
+      clearBtn.className = "field-clear";
+      clearBtn.title = `Limpar "${f.label}"`;
+      clearBtn.textContent = "×";
+      clearBtn.addEventListener("click", async () => {
+        if (!value) return;
+        setSaving("saving");
+        try {
+          await drawerCtx.persistField(f.key, "");
+          setSaving("saved");
+          ctx.onReopen();
+        } catch (err) {
+          setSaving("error");
+          alert("Não foi possível limpar: " + describeError(err));
+        }
+      });
+      row.appendChild(clearBtn);
+    }
     wrap.appendChild(row);
     fieldsEl.appendChild(wrap);
   }
 
   const valorInput = document.getElementById("drawerValor");
   valorInput.value = cell.valorBaseTarget || "";
+  valorInput.disabled = !canEdit;
   valorInput.oninput = () => persistValor(valorInput.value);
 
   const obsInput = document.getElementById("drawerObservacoes");
   obsInput.value = cell.observacoes || "";
+  obsInput.disabled = !canEdit;
   obsInput.oninput = () => persistObs(obsInput.value);
 
   drawerEl.classList.add("drawer-open");
@@ -1556,6 +1575,7 @@ function showAuthScreen() {
   currentUser = null;
   currentProfile = null;
   isAdmin = false;
+  canEdit = false;
 }
 function showAppScreen() {
   authScreenEl.hidden = true;
@@ -1570,10 +1590,13 @@ function clearLoadError() {
   loadErrorEl.hidden = true;
 }
 
+const ROLE_LABEL = { admin: "Administrador", auditor: "Auditor", leitor: "Leitor" };
+
 function renderAuthBar() {
   document.getElementById("authUserLabel").textContent = (currentProfile && currentProfile.full_name) || currentUser.email;
   const roleBadge = document.getElementById("authRoleBadge");
-  roleBadge.textContent = isAdmin ? "Administrador" : "Auditor";
+  const role = (currentProfile && currentProfile.role) || "auditor";
+  roleBadge.textContent = ROLE_LABEL[role] || role;
   roleBadge.className = "role-badge" + (isAdmin ? " role-badge-admin" : "");
 
   const toggleHiddenBtn = document.getElementById("btnToggleHidden");
@@ -1593,6 +1616,7 @@ async function onSignedIn(session) {
     const { data: profile } = await sb.from("profiles").select("*").eq("id", currentUser.id).maybeSingle();
     currentProfile = profile || null;
     isAdmin = !!(currentProfile && currentProfile.role === "admin");
+    canEdit = !!(currentProfile && currentProfile.role !== "leitor");
     renderAuthBar();
     await loadAll();
     render();

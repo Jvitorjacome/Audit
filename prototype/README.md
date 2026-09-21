@@ -93,14 +93,25 @@ do que ajudaria ali.
 
 ## Login e permissões
 
-- Qualquer usuário autenticado (papel `auditor` ou `admin`) pode **ler tudo** e **editar os
-  status mensais** dos campos — é o trabalho do dia a dia do auditor.
-- Só usuários com papel `admin` (tabela `profiles`) veem os botões **+** e **×** e conseguem
-  criar/remover Estado, Propriedade, Centro de custo ou Campo. Isso é reforçado tanto na
-  interface (botões escondidos) quanto no banco (políticas de RLS) — um auditor sem esse papel
-  não consegue alterar a estrutura mesmo manipulando a página diretamente.
-- Cada escrita de status grava `updated_by` e alimenta `audit_status_history` automaticamente
-  (trilha de auditoria — quem mudou o quê e quando), sem o frontend precisar fazer nada extra.
+Três papéis (`profiles.role`), cada um mais restrito que o anterior:
+
+- **`admin`** — acesso total: lê tudo, edita status/contas variáveis e mexe na estrutura da
+  árvore (cria/renomeia/oculta/remove Estado, Propriedade, Centro de custo ou Campo). Só quem
+  tem esse papel vê os botões **+** e **×** de estrutura.
+- **`auditor`** — lê tudo e **edita os status mensais** e as contas variáveis (o trabalho de
+  auditoria do dia a dia), mas não vê os botões de estrutura — não cria/remove Estado,
+  Propriedade, Centro de custo ou Campo.
+- **`leitor`** — só leitura, em tudo (árvore, status, contas variáveis, dashboard de
+  Indicadores). Não edita nada: o badge de papel mostra "Leitor", os campos do painel lateral
+  aparecem desabilitados (dá pra ver o valor, não pra mudar), e os botões de ação (limpar
+  célula, "+ Variável", renomear/apagar conta variável, "Limpar tudo", ocultar mês) somem da
+  interface. Pensado pra quem só acompanha o andamento da auditoria sem participar dela.
+
+Cada regra é reforçada tanto na interface (botões escondidos, campos desabilitados) quanto no
+banco (políticas de RLS) — ninguém consegue alterar o que o papel não permite mesmo manipulando
+a página diretamente. Cada escrita de status grava `updated_by` e alimenta
+`audit_status_history` automaticamente (trilha de auditoria — quem mudou o quê e quando), sem o
+frontend precisar fazer nada extra.
 
 ## A hierarquia
 
@@ -231,9 +242,9 @@ A diferença é que uma conta variável **já nasce presa a um mês específico*
 permanente da árvore com uma célula em cada mês como o campo fixo; é um lançamento avulso daquele
 mês só. Por isso:
 
-- Qualquer usuário autenticado (não só `admin`) pode criar, editar, renomear e apagar contas
-  variáveis — é trabalho de auditoria do dia a dia, igual marcar status de um campo fixo, não uma
-  mudança estrutural da árvore.
+- `admin` e `auditor` podem criar, editar, renomear e apagar contas variáveis — é trabalho de
+  auditoria do dia a dia, igual marcar status de um campo fixo, não uma mudança estrutural da
+  árvore. `leitor` só lê (não vê o botão "+ Variável" nem ✎/× nas linhas existentes).
 - Pra criar uma: no **Centro de custo** onde a despesa se encaixa, clique em **"+ Variável"**,
   digite o nome (livre — muda a cada lançamento, ex.: "Reembolso viagem João") e o mês. O painel
   de edição já abre na hora.
