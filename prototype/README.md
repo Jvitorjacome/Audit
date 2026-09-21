@@ -1,4 +1,4 @@
-# DRE — Sistema de Auditoria QAVI
+# Sistema de Auditoria - QAVI
 
 ## Status: conectado ao Supabase de produção
 

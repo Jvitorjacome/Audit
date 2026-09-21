@@ -146,16 +146,6 @@ body {
   flex-wrap: wrap;
 }
 
-.header-updated {
-  font-size: 0.72rem;
-  font-variant-numeric: tabular-nums;
-  color: var(--navy-text-muted);
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid var(--navy-border);
-  border-radius: 20px;
-  padding: 4px 10px;
-}
-
 .auth-user {
   font-size: 0.84rem;
   font-weight: 500;

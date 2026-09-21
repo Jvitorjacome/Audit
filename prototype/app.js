@@ -988,11 +988,6 @@ function render() {
   renderMonthFilter();
   renderTreeTable();
   renderSummary();
-  const updatedEl = document.getElementById("headerUpdated");
-  if (updatedEl) {
-    updatedEl.hidden = false;
-    updatedEl.textContent = "Atualizado às " + new Date().toLocaleTimeString("pt-BR");
-  }
 }
 
 // ---------- drawer ----------
