@@ -536,7 +536,7 @@ thead .col-account { background: var(--surface-2); z-index: 2; }
   border-radius: 5px;
   width: 26px;
   height: 26px;
-  opacity: 0.4;
+  opacity: 0.22;
   transition: opacity 0.12s ease;
 }
 tr:hover > td .row-delete,
@@ -608,7 +608,7 @@ tr:hover > td .row-toggle-active,
   border-radius: 5px;
   width: 26px;
   height: 26px;
-  opacity: 0.5;
+  opacity: 0.25;
   transition: opacity 0.12s ease;
 }
 tr:hover > td .row-add, .row-add:focus-visible { opacity: 1; }
