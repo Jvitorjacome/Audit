@@ -90,6 +90,16 @@ body {
   padding-block: 24px;
 }
 
+/* #tabAuditoria é uma div "crua" (sem flex/gap próprio) — legend, toolbar,
+   summary e a tabela ficavam encostados um no outro, sem respiro nenhum
+   entre eles, só o padding interno de cada um. Mesmo espaçamento de 18px
+   do resto do layout (.wrap), agora também entre esses blocos. */
+#tabAuditoria {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
 /* Cabeçalho claro (não mais uma faixa navy cheia) — o navy vira detalhe no
    selo do ícone, não a superfície inteira; menos um bloco de cor grande na
    tela, mais coerente com "ultraminimalista". */
