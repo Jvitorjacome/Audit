@@ -194,6 +194,80 @@ create index on audit_status (audit_field_id);
 create index on audit_status (year, month);
 
 -- ----------------------------------------------------------------------------
+-- Contas variáveis: despesas/lançamentos que NÃO aparecem todo mês (ao
+-- contrário de audit_fields, que é uma lista fixa de campos esperados em
+-- todo mês). Cada linha aqui já É um lançamento de um mês específico — não
+-- existe uma "estrutura" separada dos "dados" como em audit_fields/
+-- audit_status, porque não faz sentido esse item persistir pros outros
+-- meses (ele simplesmente não existiu neles). Mesmos indicadores e rastreio
+-- de ocorrência que audit_status, pra auditar do mesmo jeito.
+-- ----------------------------------------------------------------------------
+create table variable_entries (
+  id uuid primary key default gen_random_uuid(),
+  cost_center_id uuid not null references cost_centers(id) on delete cascade,
+  year int not null,
+  month int not null check (month between 1 and 12),
+  name text not null, -- descrição livre (muda a cada lançamento, ex.: "Reembolso viagem João")
+  sort_order int not null default 0,
+
+  valores_banco audit_status_value not null default 'nao_verificado',
+  coerencia_numerica audit_status_value not null default 'nao_verificado',
+  coerencia_contabil audit_status_value not null default 'nao_verificado',
+  composicao_debito audit_status_value not null default 'nao_verificado',
+  coerencia_patrimonial audit_status_value not null default 'nao_verificado',
+
+  valor_base_target text,
+  observacoes text,
+
+  ocorrencia_tipo text,
+  corrigido text check (corrigido in ('Sim', 'Não')),
+  setor_responsavel text,
+  funcionario_responsavel text,
+
+  created_by uuid references profiles(id),
+  updated_by uuid references profiles(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index on variable_entries (cost_center_id);
+create index on variable_entries (year, month);
+
+create table variable_entries_history (
+  id uuid primary key default gen_random_uuid(),
+  variable_entry_id uuid not null references variable_entries(id) on delete cascade,
+  changed_by uuid references profiles(id),
+  changed_at timestamptz not null default now(),
+  old_values jsonb not null,
+  new_values jsonb not null
+);
+
+create index on variable_entries_history (variable_entry_id);
+
+create or replace function log_variable_entry_change()
+returns trigger as $$
+begin
+  if (tg_op = 'UPDATE') then
+    insert into variable_entries_history (variable_entry_id, changed_by, old_values, new_values)
+    values (
+      new.id,
+      new.updated_by,
+      to_jsonb(old) - 'updated_at',
+      to_jsonb(new) - 'updated_at'
+    );
+  end if;
+  return new;
+end;
+$$ language plpgsql
+security definer
+set search_path = public, pg_temp;
+
+create trigger trg_variable_entries_history
+  after update on variable_entries
+  for each row
+  execute function log_variable_entry_change();
+
+-- ----------------------------------------------------------------------------
 -- Trilha de auditoria (rastrear quem mudou o quê): fundamental pra um sistema
 -- que audita dinheiro. Toda vez que audit_status muda, grava uma linha aqui
 -- via trigger — não depende de o frontend lembrar de registrar.
@@ -282,6 +356,8 @@ alter table audit_status enable row level security;
 alter table audit_status_history enable row level security;
 alter table profiles enable row level security;
 alter table ocorrencia_options enable row level security;
+alter table variable_entries enable row level security;
+alter table variable_entries_history enable row level security;
 
 create policy "authenticated read" on sections for select using (auth.role() = 'authenticated');
 create policy "authenticated read" on states for select using (auth.role() = 'authenticated');
@@ -292,10 +368,19 @@ create policy "authenticated read" on audit_status for select using (auth.role()
 create policy "authenticated read" on audit_status_history for select using (auth.role() = 'authenticated');
 create policy "own profile read" on profiles for select using (auth.role() = 'authenticated');
 create policy "authenticated read" on ocorrencia_options for select using (auth.role() = 'authenticated');
+create policy "authenticated read" on variable_entries for select using (auth.role() = 'authenticated');
+create policy "authenticated read" on variable_entries_history for select using (auth.role() = 'authenticated');
 
 -- Status: qualquer auditor autenticado pode editar (é o trabalho dele)
 create policy "authenticated write status" on audit_status for insert with check (auth.role() = 'authenticated');
 create policy "authenticated update status" on audit_status for update using (auth.role() = 'authenticated');
+
+-- Contas variáveis: criar/editar/renomear/apagar é trabalho de auditoria do
+-- dia a dia (não é "estrutura" no sentido de sections/states/.../audit_fields),
+-- então qualquer autenticado pode — igual ao status dos campos fixos.
+create policy "authenticated write variable_entries" on variable_entries for insert with check (auth.role() = 'authenticated');
+create policy "authenticated update variable_entries" on variable_entries for update using (auth.role() = 'authenticated');
+create policy "authenticated delete variable_entries" on variable_entries for delete using (auth.role() = 'authenticated');
 
 -- Estrutura (adicionar/remover estado, propriedade, centro, campo): só admin
 create policy "admin write sections" on sections for all using (

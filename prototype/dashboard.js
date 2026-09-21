@@ -44,11 +44,13 @@ function dashClassifyImpact(tipo) {
 
 function collectDashboardRows() {
   const propertyByCampoId = {};
+  const propertyByCostCenterId = {};
   const activeCampoIds = [];
   for (const section of state.tree || []) {
     for (const channel of section.channels || []) {
       for (const property of channel.properties || []) {
         for (const centro of property.centros || []) {
+          propertyByCostCenterId[centro.id] = property.name;
           for (const campo of centro.campos || []) {
             if (campo.isActive === false) continue;
             propertyByCampoId[campo.id] = property.name;
@@ -63,33 +65,47 @@ function collectDashboardRows() {
   // por mês: total geral + contagem por propriedade, pra "Total analisado" (e o
   // "analisados" de cada card de mês) respeitarem o filtro de propriedade também.
   const analyzedByMonth = {};
+
+  // Reaproveitado pra campo fixo E conta variável (mesmos indicadores, mesma
+  // regra de "o que conta como analisado/não conforme") — só muda de onde a
+  // "cell" vem: state.cells pro campo, rowToCell(entry) direto pra variável.
+  function registerAssessment(propriedade, monthKey, cell) {
+    if (!cell || cell.isHidden) return;
+    // "analisado" = pelo menos um dos 5 indicadores foi de fato marcado
+    // (não conta uma célula tocada só pra preencher valor/observações/ocorrência).
+    const wasAssessed = STATUS_FIELDS.some((f) => cell[f.key] && cell[f.key] !== "Não verificado");
+    if (!wasAssessed) return;
+    const bucket = (analyzedByMonth[monthKey] ||= { total: 0, byProp: {} });
+    bucket.total += 1;
+    bucket.byProp[propriedade] = (bucket.byProp[propriedade] || 0) + 1;
+    const hasNaoConforme = STATUS_FIELDS.some((f) => cell[f.key] === "Não Conforme");
+    if (!hasNaoConforme) return;
+    rows.push({
+      propriedade, mes: monthKey,
+      valor: dashParseValor(cell.valorBaseTarget),
+      ocorrenciaTipo: cell.ocorrenciaTipo || "",
+      corrigido: cell.corrigido || "",
+      setor: cell.setorResponsavel || "",
+      funcionario: cell.funcionarioResponsavel || "",
+      impactType: dashClassifyImpact(cell.ocorrenciaTipo),
+    });
+  }
+
   for (const campoId of activeCampoIds) {
     for (const m of MONTHS) {
-      const raw = state.cells[cellKey(campoId, m.key)];
-      if (!raw || raw.isHidden) continue;
-      // "analisado" = pelo menos um dos 5 indicadores foi de fato marcado
-      // (não conta uma célula tocada só pra preencher valor/observações/ocorrência).
-      const wasAssessed = STATUS_FIELDS.some((f) => raw[f.key] && raw[f.key] !== "Não verificado");
-      if (!wasAssessed) continue;
-      const propriedade = propertyByCampoId[campoId] || "—";
-      const bucket = (analyzedByMonth[m.key] ||= { total: 0, byProp: {} });
-      bucket.total += 1;
-      bucket.byProp[propriedade] = (bucket.byProp[propriedade] || 0) + 1;
-      const hasNaoConforme = STATUS_FIELDS.some((f) => raw[f.key] === "Não Conforme");
-      if (!hasNaoConforme) continue;
-      rows.push({
-        propriedade: propertyByCampoId[campoId] || "—",
-        mes: m.key,
-        valor: dashParseValor(raw.valorBaseTarget),
-        ocorrenciaTipo: raw.ocorrenciaTipo || "",
-        corrigido: raw.corrigido || "",
-        setor: raw.setorResponsavel || "",
-        funcionario: raw.funcionarioResponsavel || "",
-        impactType: dashClassifyImpact(raw.ocorrenciaTipo),
-      });
+      registerAssessment(propertyByCampoId[campoId] || "—", m.key, state.cells[cellKey(campoId, m.key)]);
     }
   }
-  const properties = Array.from(new Set(Object.values(propertyByCampoId))).sort();
+
+  for (const entry of state.variableEntries || []) {
+    const m = MONTH_BY_NUMBER[entry.month];
+    if (!m) continue;
+    registerAssessment(propertyByCostCenterId[entry.cost_center_id] || "—", m.key, rowToCell(entry));
+  }
+
+  const properties = Array.from(
+    new Set([...Object.values(propertyByCampoId), ...Object.values(propertyByCostCenterId)])
+  ).sort();
   return { rows, analyzedByMonth, properties };
 }
 

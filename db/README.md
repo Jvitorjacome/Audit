@@ -19,6 +19,17 @@ projeto Supabase de produção da QAVI** ("Auditoria - Qavi", projeto
   contém o resultado de todas elas — só use a pasta `migrations/` se estiver
   aplicando em um projeto que já rodava uma versão anterior do schema.
 
+### `migrations/007_variable_entries.sql`
+
+Já aplicada. Tabela nova `variable_entries` (+ `variable_entries_history`, com o mesmo padrão de
+trilha de auditoria via trigger `security definer` que `audit_status_history` já tinha): contas
+variáveis, despesas que não aparecem todo mês. Ao contrário de `audit_fields`/`audit_status`
+(estrutura fixa + status por mês em tabelas separadas), aqui cada linha já é um lançamento de um
+mês específico — mesmas colunas de indicador/ocorrência que `audit_status`, mas sem separar
+estrutura de dado, porque não faz sentido o item persistir pros meses em que não existiu. RLS:
+qualquer autenticado pode ler/criar/editar/apagar (é trabalho de auditoria do dia a dia, não
+estrutura admin-only como as outras 5 tabelas da hierarquia).
+
 ### `migrations/006_per_month_hide_and_scoped_actions.sql`
 
 Já aplicada. Adiciona `audit_status.is_hidden`, pra dar suporte a ocultar um campo auditado só

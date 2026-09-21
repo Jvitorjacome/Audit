@@ -176,6 +176,37 @@ deste mês"** no topo do painel zera de uma vez todos os indicadores, a ocorrên
 base/target e as observações daquele campo naquele mês — pede confirmação antes, porque não dá
 pra desfazer.
 
+## Contas variáveis (despesas que não aparecem todo mês)
+
+Além dos **campos de auditoria** fixos (esperados em todo mês), agora dá pra auditar **contas
+variáveis** — despesas que só aparecem de vez em quando (reembolso, compra pontual, etc.) — do
+mesmo jeito: os mesmos 5 indicadores, o mesmo rastreio de ocorrência (tipo, setor responsável,
+funcionário responsável, corrigido), valor base/target e observações.
+
+A diferença é que uma conta variável **já nasce presa a um mês específico** — ela não é um item
+permanente da árvore com uma célula em cada mês como o campo fixo; é um lançamento avulso daquele
+mês só. Por isso:
+
+- Qualquer usuário autenticado (não só `admin`) pode criar, editar, renomear e apagar contas
+  variáveis — é trabalho de auditoria do dia a dia, igual marcar status de um campo fixo, não uma
+  mudança estrutural da árvore.
+- Pra criar uma: no **Centro de custo** onde a despesa se encaixa, clique em **"+ Variável"**,
+  digite o nome (livre — muda a cada lançamento, ex.: "Reembolso viagem João") e o mês. O painel
+  de edição já abre na hora.
+- Na árvore, a conta variável aparece como mais uma linha dentro do centro de custo, com o selo
+  **Variável** e o mês entre parênteses no nome. Ela só mostra o selo de status real na coluna do
+  mês em que existe — nos outros meses visíveis, um traço neutro ("—") no lugar, já que ela
+  simplesmente não existiu ali.
+- **✎** renomeia, **×** apaga o lançamento inteiro (sem a ressalva de "só este mês" que existe
+  pro campo fixo — aqui não tem outro mês pra preservar, então apagar é sempre definitivo, com
+  confirmação).
+- Clicar na célula (ou em qualquer parte da linha) abre o mesmo painel lateral usado pelos campos
+  fixos, só que sem o seletor de "Mês" (o mês já é fixo) e sem a opção de "ocultar este mês" (não
+  existem outros meses pra distinguir).
+- Entra nos **Indicadores** (aba abaixo) exatamente como um campo fixo — total analisado, taxa de
+  erro, valores impactados/corrigidos, erros por setor/funcionário/propriedade, tudo somado
+  junto.
+
 ## Aba Indicadores
 
 O sistema agora tem duas abas: **Auditoria** (a árvore de sempre) e **Indicadores** — um
@@ -184,7 +215,7 @@ administrador já usava, mas lendo os dados direto deste banco (não da planilha
 Filtra por mês e propriedade — **os dois filtros afetam todos os indicadores**, inclusive
 "Total analisado" e os cards de conformidade por mês (não só os gráficos de erro): filtrar por
 uma propriedade mostra só o que foi analisado *daquela* propriedade, não o total do sistema
-inteiro. Mostra:
+inteiro. Conta campos fixos e contas variáveis juntos. Mostra:
 
 - **Total analisado** — quantos campos tiveram pelo menos um dos 5 indicadores marcado no mês
   (não conta célula tocada só por causa de valor/observações/ocorrência, nem mês oculto — ver

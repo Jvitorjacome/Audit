@@ -520,6 +520,19 @@ thead .col-account { background: var(--surface-2); z-index: 2; }
 }
 .row-add:hover { background: var(--brand-weak); }
 
+.kind-badge-variavel { color: var(--brand); }
+
+.row-add-variavel {
+  width: auto;
+  padding: 0 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.row-kind-variavel .col-account { font-style: italic; }
+.cell-month-na { cursor: default; }
+.cell-month-placeholder { color: var(--text-muted); opacity: 0.5; }
+
 .drawer-kind {
   display: inline-block;
   font-size: 0.68rem;

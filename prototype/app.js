@@ -37,7 +37,7 @@ function childKind(kind) {
   return { section: "channel", channel: "property", property: "centro", centro: "campo" }[kind] || null;
 }
 
-const KIND_LABEL = { section: "Seção", channel: "Estado", property: "Propriedade", centro: "Centro de custo", campo: "Campo auditado" };
+const KIND_LABEL = { section: "Seção", channel: "Estado", property: "Propriedade", centro: "Centro de custo", campo: "Campo auditado", variavel: "Conta variável" };
 const KIND_ADD_LABEL = { section: "Estado", channel: "Propriedade", property: "Centro de custo", centro: "Campo" };
 
 function makeNode(kind, name, id, row = null) {
@@ -88,6 +88,7 @@ let state = {
   collapsed: (savedPrefs && savedPrefs.collapsed) || {},
   showHidden: (savedPrefs && savedPrefs.showHidden) || false,
   ocorrenciaOptions: {},
+  variableEntries: [],
 };
 
 let currentUser = null;
@@ -110,8 +111,10 @@ function statusTone(value) {
 }
 // Um campo tem 5 indicadores por mês; para a tabela (visão densa) eles viram
 // UM selo por célula, priorizando o pior caso, em vez de 5 pontos coloridos.
-function cellAggregateTone(id, monthKey) {
-  const cell = getCell(id, monthKey);
+// Separado em *FromCell pra ser reaproveitado por contas variáveis também
+// (que não têm um "id + monthKey" pra buscar em state.cells — já chegam
+// prontas como uma linha do banco, convertida com rowToCell).
+function cellAggregateToneFromCell(cell) {
   if (cell.isHidden) return { tone: "hidden", label: "Oculto" };
   let naoConforme = 0, naoVerificado = 0;
   for (const f of STATUS_FIELDS) {
@@ -123,10 +126,15 @@ function cellAggregateTone(id, monthKey) {
   if (naoVerificado > 0) return { tone: "unv", label: "Pendente" };
   return { tone: "ok", label: "Conforme" };
 }
-function cellDetailTitle(id, monthKey) {
-  const cell = getCell(id, monthKey);
+function cellDetailTitleFromCell(cell) {
   if (cell.isHidden) return "Oculto neste mês — clique pra editar ou reexibir.";
   return STATUS_FIELDS.map((f) => `${f.label}: ${cell[f.key] || "Não verificado"}`).join(" · ");
+}
+function cellAggregateTone(id, monthKey) {
+  return cellAggregateToneFromCell(getCell(id, monthKey));
+}
+function cellDetailTitle(id, monthKey) {
+  return cellDetailTitleFromCell(getCell(id, monthKey));
 }
 
 async function persistCellField(auditFieldId, monthKey, uiFieldKey, uiValue) {
@@ -171,6 +179,72 @@ async function setCellHidden(auditFieldId, monthKey, hidden) {
   const { error } = await sb.from("audit_status").upsert(payload, { onConflict: "audit_field_id,year,month" });
   if (error) throw error;
   state.cells[cellKey(auditFieldId, monthKey)] = { ...getCell(auditFieldId, monthKey), isHidden: hidden };
+}
+
+// ---------- contas variáveis (despesas que não aparecem todo mês) ----------
+// Ao contrário de audit_fields/audit_status, uma conta variável não tem uma
+// "estrutura" que persiste por todos os meses — cada linha JÁ é o lançamento
+// de um mês específico. Por isso não existe upsert por (id, mês): a linha
+// sempre já existe (foi criada explicitamente com createVariableEntry) e só
+// atualiza direto por id.
+
+function findVariableEntry(id) {
+  return (state.variableEntries || []).find((e) => e.id === id);
+}
+
+async function createVariableEntry(costCenterId, monthNumber, rawName) {
+  const siblingCount = (state.variableEntries || []).filter(
+    (e) => e.cost_center_id === costCenterId && e.month === monthNumber
+  ).length;
+  const payload = {
+    cost_center_id: costCenterId, year: YEAR, month: monthNumber, name: rawName.trim(),
+    sort_order: siblingCount, created_by: currentUser.id, updated_by: currentUser.id,
+  };
+  const { data, error } = await sb.from("variable_entries").insert(payload).select().single();
+  if (error) throw error;
+  state.variableEntries.push(data);
+  return data;
+}
+
+async function renameVariableEntry(id, newName) {
+  const { error } = await sb.from("variable_entries").update({ name: newName, updated_by: currentUser.id }).eq("id", id);
+  if (error) throw error;
+  const entry = findVariableEntry(id);
+  if (entry) entry.name = newName;
+}
+
+async function deleteVariableEntry(id) {
+  const { error } = await sb.from("variable_entries").delete().eq("id", id);
+  if (error) throw error;
+  state.variableEntries = (state.variableEntries || []).filter((e) => e.id !== id);
+}
+
+async function persistVariableField(id, uiFieldKey, uiValue) {
+  const payload = { updated_by: currentUser.id };
+  const statusField = STATUS_FIELDS.find((f) => f.key === uiFieldKey);
+  const ocorrenciaField = OCORRENCIA_FIELDS.find((f) => f.key === uiFieldKey);
+  if (statusField) payload[statusField.column] = STATUS_LABEL_TO_DB[uiValue];
+  else if (ocorrenciaField) payload[ocorrenciaField.column] = uiValue || null;
+  else if (uiFieldKey === "valorBaseTarget") payload.valor_base_target = uiValue;
+  else if (uiFieldKey === "observacoes") payload.observacoes = uiValue;
+
+  const { error } = await sb.from("variable_entries").update(payload).eq("id", id);
+  if (error) throw error;
+  const entry = findVariableEntry(id);
+  if (entry) Object.assign(entry, payload);
+}
+
+async function clearVariableEntry(id) {
+  const payload = { updated_by: currentUser.id };
+  for (const f of STATUS_FIELDS) payload[f.column] = "nao_verificado";
+  for (const f of OCORRENCIA_FIELDS) payload[f.column] = null;
+  payload.valor_base_target = null;
+  payload.observacoes = null;
+
+  const { error } = await sb.from("variable_entries").update(payload).eq("id", id);
+  if (error) throw error;
+  const entry = findVariableEntry(id);
+  if (entry) Object.assign(entry, payload);
 }
 
 function countLeaves(node, kind) {
@@ -239,15 +313,24 @@ function buildTree(sections, states, properties, costCenters, auditFields, showH
   }));
 }
 
+// Converte uma linha crua do banco (audit_status OU variable_entries — as
+// duas têm exatamente as mesmas colunas de indicador/ocorrência) pro formato
+// "cell" que o resto da UI usa (chaves em camelCase). Reaproveitado pelas
+// contas variáveis, que não passam por buildCells (não têm cellKey — já
+// chegam como uma linha só, sem mês variável).
+function rowToCell(row) {
+  const cell = { valorBaseTarget: row.valor_base_target || "", observacoes: row.observacoes || "", isHidden: !!row.is_hidden };
+  for (const f of STATUS_FIELDS) cell[f.key] = STATUS_DB_TO_LABEL[row[f.column]] || "Não verificado";
+  for (const f of OCORRENCIA_FIELDS) cell[f.key] = row[f.column] || "";
+  return cell;
+}
+
 function buildCells(statusRows) {
   const cells = {};
   for (const row of statusRows) {
     const m = MONTH_BY_NUMBER[row.month];
     if (!m) continue;
-    const cell = { valorBaseTarget: row.valor_base_target || "", observacoes: row.observacoes || "", isHidden: !!row.is_hidden };
-    for (const f of STATUS_FIELDS) cell[f.key] = STATUS_DB_TO_LABEL[row[f.column]] || "Não verificado";
-    for (const f of OCORRENCIA_FIELDS) cell[f.key] = row[f.column] || "";
-    cells[cellKey(row.audit_field_id, m.key)] = cell;
+    cells[cellKey(row.audit_field_id, m.key)] = rowToCell(row);
   }
   return cells;
 }
@@ -284,13 +367,14 @@ async function fetchAllRows(table, orderColumn, applyFilters) {
 }
 
 async function loadAll() {
-  const [sections, states, properties, costCenters, auditFields, ocorrenciaOptionsRows] = await Promise.all([
+  const [sections, states, properties, costCenters, auditFields, ocorrenciaOptionsRows, variableEntries] = await Promise.all([
     fetchAllRows("sections", "sort_order"),
     fetchAllRows("states", "sort_order"),
     fetchAllRows("properties", "sort_order"),
     fetchAllRows("cost_centers", "sort_order"),
     fetchAllRows("audit_fields", "sort_order"),
     fetchAllRows("ocorrencia_options", "sort_order"),
+    fetchAllRows("variable_entries", "sort_order", (q) => q.eq("year", YEAR)),
   ]);
 
   rawHierarchy = { sections, states, properties, costCenters, auditFields };
@@ -301,6 +385,7 @@ async function loadAll() {
     (state.ocorrenciaOptions[row.field_key] ||= []).push(row.value);
   }
 
+  state.variableEntries = variableEntries;
   state.cells = buildCells(await fetchAllRows("audit_status", "id", (q) => q.eq("year", YEAR)));
 }
 
@@ -588,6 +673,48 @@ function renderTreeTable() {
       });
       tdActions.appendChild(addBtn);
     }
+    if (kind === "centro") {
+      // Conta variável (despesa que não aparece todo mês): não é
+      // "estrutura" da árvore (não é admin-only) — é trabalho de auditoria
+      // do dia a dia, igual marcar status, então qualquer autenticado pode.
+      const addVarBtn = document.createElement("button");
+      addVarBtn.type = "button";
+      addVarBtn.className = "row-add row-add-variavel";
+      addVarBtn.title = "Adicionar conta variável (despesa que não aparece todo mês) neste centro de custo";
+      addVarBtn.textContent = "+ Variável";
+      addVarBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const name = prompt('Nome da conta variável (ex.: "Reembolso viagem João"):');
+        if (!name || !name.trim()) return;
+        const monthsHint = MONTHS.map((m) => `${m.number}-${m.label}`).join(", ");
+        const monthRaw = prompt(`Em qual mês?\n${monthsHint}`);
+        if (!monthRaw || !monthRaw.trim()) return;
+        const monthDef = MONTH_BY_NUMBER[parseInt(monthRaw.trim(), 10)];
+        if (!monthDef) {
+          alert("Mês inválido — digite um número de 1 a 12.");
+          return;
+        }
+        addVarBtn.disabled = true;
+        try {
+          const entry = await createVariableEntry(node.id, monthDef.number, name);
+          if (!state.visibleMonths.includes(monthDef.key)) {
+            state.visibleMonths = [...state.visibleMonths, monthDef.key].sort(
+              (a, b) => MONTHS.findIndex((mm) => mm.key === a) - MONTHS.findIndex((mm) => mm.key === b)
+            );
+          }
+          state.collapsed[node.id] = false;
+          saveViewPrefs();
+          renderTreeTable();
+          renderSummary();
+          openVariableDrawer(entry);
+        } catch (err) {
+          alert("Não foi possível criar: " + describeError(err));
+        } finally {
+          addVarBtn.disabled = false;
+        }
+      });
+      tdActions.appendChild(addVarBtn);
+    }
     if (kind === "campo" && isAdmin) {
       const renameBtn = document.createElement("button");
       renameBtn.type = "button";
@@ -671,7 +798,136 @@ function renderTreeTable() {
 
     if (hasKids && !collapsed) {
       for (const child of kids) renderNode(child, nextKind, depth + 1, kids);
+      if (kind === "centro") {
+        const entries = (state.variableEntries || []).filter((e) => e.cost_center_id === node.id);
+        for (const entry of entries) renderVariableEntryRow(entry, depth + 1);
+      }
     }
+  }
+
+  // Uma conta variável não faz parte de state.tree (ver ---- contas
+  // variáveis ---- em app.js) — renderiza como mais uma linha "folha",
+  // visualmente parecida com um campo, mas só tem selo de status na coluna
+  // do mês em que ela de fato existe; nos outros meses visíveis mostra um
+  // traço neutro, não clicável.
+  function renderVariableEntryRow(entry, depth) {
+    const monthDef = MONTH_BY_NUMBER[entry.month];
+    const monthLabel = monthDef ? monthDef.label : `mês ${entry.month}`;
+
+    const tr = document.createElement("tr");
+    tr.className = `row-tree row-depth-${Math.min(depth, 5)} row-kind-variavel`;
+    const tdName = document.createElement("td");
+    tdName.className = "col-account";
+    tdName.style.paddingLeft = `${10 + depth * 20}px`;
+
+    const spacer = document.createElement("span");
+    spacer.className = "toggle-spacer";
+    tdName.appendChild(spacer);
+
+    const badge = document.createElement("span");
+    badge.className = "kind-badge kind-badge-variavel";
+    badge.textContent = "Variável";
+    tdName.appendChild(badge);
+
+    const nameSpan = document.createElement("span");
+    nameSpan.className = "node-name";
+    nameSpan.textContent = entry.name || "(sem nome)";
+    nameSpan.title = `${KIND_LABEL.variavel} · ${monthLabel} de ${entry.year}`;
+    tdName.appendChild(nameSpan);
+
+    const monthBadge = document.createElement("span");
+    monthBadge.className = "node-count";
+    monthBadge.textContent = ` (${monthLabel})`;
+    tdName.appendChild(monthBadge);
+    tr.appendChild(tdName);
+
+    tr.appendChild(variableEntryCellsFragment(entry, months));
+    tr.addEventListener("click", (e) => {
+      if (e.target.closest("button")) return;
+      openVariableDrawer(entry);
+    });
+
+    const tdActions = document.createElement("td");
+    tdActions.className = "col-actions";
+
+    const renameBtn = document.createElement("button");
+    renameBtn.type = "button";
+    renameBtn.className = "row-rename";
+    renameBtn.title = "Renomear conta variável";
+    renameBtn.textContent = "✎";
+    renameBtn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const newName = prompt("Novo nome do lançamento:", entry.name);
+      if (!newName || !newName.trim() || newName.trim() === entry.name) return;
+      renameBtn.disabled = true;
+      try {
+        await renameVariableEntry(entry.id, newName.trim());
+        renderTreeTable();
+      } catch (err) {
+        alert("Não foi possível renomear: " + describeError(err));
+      } finally {
+        renameBtn.disabled = false;
+      }
+    });
+    tdActions.appendChild(renameBtn);
+
+    const delBtn = document.createElement("button");
+    delBtn.type = "button";
+    delBtn.className = "row-delete";
+    delBtn.title = "Apagar este lançamento variável";
+    delBtn.textContent = "×";
+    delBtn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      if (!confirm(`Apagar o lançamento "${entry.name}" (${monthLabel} de ${entry.year})? Essa ação não pode ser desfeita.`)) return;
+      delBtn.disabled = true;
+      try {
+        await deleteVariableEntry(entry.id);
+        renderTreeTable();
+        renderSummary();
+      } catch (err) {
+        alert("Não foi possível apagar: " + describeError(err));
+        delBtn.disabled = false;
+      }
+    });
+    tdActions.appendChild(delBtn);
+
+    tr.appendChild(tdActions);
+    tbody.appendChild(tr);
+  }
+
+  function variableEntryCellsFragment(entry, monthsToRender) {
+    const frag = document.createDocumentFragment();
+    const entryMonth = MONTH_BY_NUMBER[entry.month];
+    for (const m of monthsToRender) {
+      const td = document.createElement("td");
+      if (!entryMonth || m.key !== entryMonth.key) {
+        td.className = "cell-month cell-month-na";
+        const dash = document.createElement("span");
+        dash.className = "cell-month-placeholder";
+        dash.textContent = "—";
+        td.appendChild(dash);
+        frag.appendChild(td);
+        continue;
+      }
+      td.className = "cell-month";
+      const cell = rowToCell(entry);
+      const { tone, label } = cellAggregateToneFromCell(cell);
+      const inner = document.createElement("span");
+      inner.className = "cell-month-inner";
+      const badge = document.createElement("span");
+      badge.className = `status-badge status-badge-${tone}`;
+      badge.textContent = label;
+      inner.appendChild(badge);
+      td.appendChild(inner);
+      td.title = cellDetailTitleFromCell(cell);
+      if (tone === "div") td.classList.add("cell-tone-div");
+      td.addEventListener("click", (e) => {
+        e.stopPropagation();
+        openVariableDrawer(entry);
+      });
+      frag.appendChild(td);
+    }
+    return frag;
   }
 
   for (const section of state.tree) renderNode(section, "section", 0, null);
@@ -702,9 +958,26 @@ function renderSummary() {
       }
     }
   }
+  // Contas variáveis entram na mesma contagem — só as que caem num mês
+  // atualmente visível (já que elas só existem num mês fixo, ao contrário
+  // do campo, que existe em todos e só mostra o que estiver visível).
+  const monthKeysVisible = new Set(months.map((m) => m.key));
+  let variableCount = 0;
+  for (const entry of state.variableEntries || []) {
+    const m = MONTH_BY_NUMBER[entry.month];
+    if (!m || !monthKeysVisible.has(m.key)) continue;
+    variableCount++;
+    const cell = rowToCell(entry);
+    for (const f of STATUS_FIELDS) {
+      total++;
+      const v = cell[f.key];
+      if (v) filled++;
+      if (v === "Não Conforme") div++;
+    }
+  }
   const pct = total ? Math.round((filled / total) * 100) : 0;
   summaryEl.innerHTML = `
-    <div class="stat"><span class="stat-value">${ids.length}</span><span class="stat-label">campos auditados</span></div>
+    <div class="stat"><span class="stat-value">${ids.length + variableCount}</span><span class="stat-label">campos auditados</span></div>
     <div class="stat"><span class="stat-value">${months.length}</span><span class="stat-label">meses visíveis</span></div>
     <div class="stat"><span class="stat-value">${pct}%</span><span class="stat-label">campos verificados</span></div>
     <div class="stat stat-danger"><span class="stat-value">${div}</span><span class="stat-label">não conformes</span></div>
@@ -739,10 +1012,10 @@ function setSaving(kind) {
 }
 
 function makeTextPersister(uiFieldKey) {
-  return debounce(async (id, monthKey, value) => {
+  return debounce(async (value) => {
     setSaving("saving");
     try {
-      await persistCellField(id, monthKey, uiFieldKey, value);
+      await drawerCtx.persistField(uiFieldKey, value);
       setSaving("saved");
     } catch (err) {
       setSaving("error");
@@ -752,30 +1025,76 @@ function makeTextPersister(uiFieldKey) {
 const persistValor = makeTextPersister("valorBaseTarget");
 const persistObs = makeTextPersister("observacoes");
 
+// Abre o painel lateral pra um campo auditado (fixo), num mês específico —
+// permite trocar de mês, e tem a opção "ocultar só este mês" (além do 🗕 da
+// linha, que oculta em todos os meses). Ver openVariableDrawer pro mesmo
+// painel aplicado a uma conta variável (sem seletor de mês nem ocultar,
+// já que uma conta variável só existe num mês só).
 function openDrawer(node, month, kindLabel) {
   const months = visibleMonthList();
   const useMonth = month || months[0];
   if (!useMonth) return;
-  drawerCtx = { id: node.id, monthKey: useMonth.key };
-  const cell = getCell(node.id, useMonth.key);
+  renderDrawerBody({
+    title: node.name || "(sem nome)",
+    kindLabel: kindLabel || "",
+    subtitle: node.row ? `linha ${node.row} na planilha original` : "adicionado neste sistema",
+    monthPicker: { months, selected: useMonth, onChange: (m) => openDrawer(node, m, kindLabel) },
+    getCell: () => getCell(node.id, useMonth.key),
+    persistField: (key, value) => persistCellField(node.id, useMonth.key, key, value),
+    clearAll: () => clearCell(node.id, useMonth.key),
+    clearConfirmText: `Limpar todos os campos de auditoria de "${node.name}" em ${useMonth.label}? Essa ação não pode ser desfeita.`,
+    setHidden: (hidden) => setCellHidden(node.id, useMonth.key, hidden),
+    hideLabel: `Ocultar "${node.name}" em ${useMonth.label}`,
+    onReopen: () => openDrawer(node, useMonth, kindLabel),
+  });
+}
 
-  document.getElementById("drawerTitle").textContent = node.name || "(sem nome)";
-  document.getElementById("drawerKind").textContent = kindLabel || "";
+// Mesmo painel, pra uma conta variável (ver ---- contas variáveis ---- mais
+// acima): sem seletor de mês (o mês já é fixo naquela linha) e sem "ocultar
+// este mês" (não existem "outros meses" pra distinguir).
+function openVariableDrawer(entry) {
+  const m = MONTH_BY_NUMBER[entry.month];
+  const centro = (rawHierarchy && rawHierarchy.costCenters || []).find((c) => c.id === entry.cost_center_id);
+  renderDrawerBody({
+    title: entry.name || "(sem nome)",
+    kindLabel: KIND_LABEL.variavel,
+    subtitle: `${m ? m.label : "mês " + entry.month} de ${entry.year}` + (centro ? ` · ${centro.name}` : ""),
+    monthPicker: null,
+    getCell: () => rowToCell(findVariableEntry(entry.id) || entry),
+    persistField: (key, value) => persistVariableField(entry.id, key, value),
+    clearAll: () => clearVariableEntry(entry.id),
+    clearConfirmText: `Limpar todos os indicadores de "${entry.name}"? Essa ação não pode ser desfeita.`,
+    setHidden: null,
+    hideLabel: null,
+    onReopen: () => openVariableDrawer(entry),
+  });
+}
+
+function renderDrawerBody(ctx) {
+  drawerCtx = ctx;
+  const cell = ctx.getCell();
+
+  document.getElementById("drawerTitle").textContent = ctx.title;
+  document.getElementById("drawerKind").textContent = ctx.kindLabel || "";
   const saveStatusEl = document.getElementById("drawerSaveStatus");
   if (saveStatusEl) saveStatusEl.hidden = true;
 
+  const monthFieldEl = document.getElementById("drawerMonthField");
   const monthSelectEl = document.getElementById("drawerMonth");
-  monthSelectEl.innerHTML = "";
-  for (const m of months) {
-    const o = document.createElement("option");
-    o.value = m.key;
-    o.textContent = m.label;
-    if (m.key === useMonth.key) o.selected = true;
-    monthSelectEl.appendChild(o);
+  monthFieldEl.hidden = !ctx.monthPicker;
+  if (ctx.monthPicker) {
+    monthSelectEl.innerHTML = "";
+    for (const m of ctx.monthPicker.months) {
+      const o = document.createElement("option");
+      o.value = m.key;
+      o.textContent = m.label;
+      if (m.key === ctx.monthPicker.selected.key) o.selected = true;
+      monthSelectEl.appendChild(o);
+    }
+    monthSelectEl.onchange = () => ctx.monthPicker.onChange(MONTHS.find((m) => m.key === monthSelectEl.value));
   }
-  monthSelectEl.onchange = () => openDrawer(node, MONTHS.find((m) => m.key === monthSelectEl.value), kindLabel);
 
-  document.getElementById("drawerSubtitle").textContent = node.row ? `linha ${node.row} na planilha original` : "adicionado neste sistema";
+  document.getElementById("drawerSubtitle").textContent = ctx.subtitle;
 
   const fieldsEl = document.getElementById("drawerFields");
   fieldsEl.innerHTML = "";
@@ -783,15 +1102,15 @@ function openDrawer(node, month, kindLabel) {
   const clearAllBtn = document.createElement("button");
   clearAllBtn.type = "button";
   clearAllBtn.className = "btn btn-clear-all";
-  clearAllBtn.textContent = "Limpar tudo deste mês";
+  clearAllBtn.textContent = ctx.monthPicker ? "Limpar tudo deste mês" : "Limpar tudo";
   clearAllBtn.addEventListener("click", async () => {
-    if (!confirm(`Limpar todos os campos de auditoria de "${node.name}" em ${useMonth.label}? Essa ação não pode ser desfeita.`)) return;
+    if (!confirm(ctx.clearConfirmText)) return;
     clearAllBtn.disabled = true;
     setSaving("saving");
     try {
-      await clearCell(drawerCtx.id, drawerCtx.monthKey);
+      await ctx.clearAll();
       setSaving("saved");
-      openDrawer(node, useMonth, kindLabel);
+      ctx.onReopen();
       renderTreeTable();
       renderSummary();
     } catch (err) {
@@ -804,34 +1123,37 @@ function openDrawer(node, month, kindLabel) {
 
   // Oculta só este campo, só neste mês (diferente do 🗕 da linha, que oculta
   // o campo inteiro em todos os meses) — pra quando ele não se aplica num
-  // mês específico, mas continua valendo nos outros.
-  const hideMonthLabel = document.createElement("label");
-  hideMonthLabel.className = "month-hide-toggle";
-  const hideMonthCheckbox = document.createElement("input");
-  hideMonthCheckbox.type = "checkbox";
-  hideMonthCheckbox.checked = !!cell.isHidden;
-  const hideMonthText = document.createElement("span");
-  hideMonthText.textContent = `Ocultar "${node.name}" em ${useMonth.label}`;
-  hideMonthLabel.appendChild(hideMonthCheckbox);
-  hideMonthLabel.appendChild(hideMonthText);
-  hideMonthCheckbox.addEventListener("change", async () => {
-    const hidden = hideMonthCheckbox.checked;
-    hideMonthCheckbox.disabled = true;
-    setSaving("saving");
-    try {
-      await setCellHidden(drawerCtx.id, drawerCtx.monthKey, hidden);
-      setSaving("saved");
-      renderTreeTable();
-      renderSummary();
-    } catch (err) {
-      setSaving("error");
-      hideMonthCheckbox.checked = !hidden;
-      alert("Não foi possível " + (hidden ? "ocultar" : "reexibir") + ": " + describeError(err));
-    } finally {
-      hideMonthCheckbox.disabled = false;
-    }
-  });
-  fieldsEl.appendChild(hideMonthLabel);
+  // mês específico, mas continua valendo nos outros. Não existe pra contas
+  // variáveis (ctx.setHidden é null): elas já só existem num mês.
+  if (ctx.setHidden) {
+    const hideMonthLabel = document.createElement("label");
+    hideMonthLabel.className = "month-hide-toggle";
+    const hideMonthCheckbox = document.createElement("input");
+    hideMonthCheckbox.type = "checkbox";
+    hideMonthCheckbox.checked = !!cell.isHidden;
+    const hideMonthText = document.createElement("span");
+    hideMonthText.textContent = ctx.hideLabel;
+    hideMonthLabel.appendChild(hideMonthCheckbox);
+    hideMonthLabel.appendChild(hideMonthText);
+    hideMonthCheckbox.addEventListener("change", async () => {
+      const hidden = hideMonthCheckbox.checked;
+      hideMonthCheckbox.disabled = true;
+      setSaving("saving");
+      try {
+        await ctx.setHidden(hidden);
+        setSaving("saved");
+        renderTreeTable();
+        renderSummary();
+      } catch (err) {
+        setSaving("error");
+        hideMonthCheckbox.checked = !hidden;
+        alert("Não foi possível " + (hidden ? "ocultar" : "reexibir") + ": " + describeError(err));
+      } finally {
+        hideMonthCheckbox.disabled = false;
+      }
+    });
+    fieldsEl.appendChild(hideMonthLabel);
+  }
 
   for (const f of STATUS_FIELDS) {
     const wrap = document.createElement("label");
@@ -853,7 +1175,7 @@ function openDrawer(node, month, kindLabel) {
       select.className = `select select-${statusTone(select.value)}`;
       setSaving("saving");
       try {
-        await persistCellField(drawerCtx.id, drawerCtx.monthKey, f.key, select.value);
+        await drawerCtx.persistField(f.key, select.value);
         setSaving("saved");
         renderTreeTable();
         renderSummary();
@@ -870,7 +1192,7 @@ function openDrawer(node, month, kindLabel) {
     clearBtn.addEventListener("click", async () => {
       setSaving("saving");
       try {
-        await persistCellField(drawerCtx.id, drawerCtx.monthKey, f.key, "Não verificado");
+        await drawerCtx.persistField(f.key, "Não verificado");
         select.value = "Não verificado";
         select.className = "select select-unv";
         setSaving("saved");
@@ -935,9 +1257,9 @@ function openDrawer(node, month, kindLabel) {
         setSaving("saving");
         try {
           await addOcorrenciaOption(f.key, newValue.trim());
-          await persistCellField(drawerCtx.id, drawerCtx.monthKey, f.key, newValue.trim());
+          await drawerCtx.persistField(f.key, newValue.trim());
           setSaving("saved");
-          openDrawer(node, useMonth, kindLabel);
+          ctx.onReopen();
         } catch (err) {
           setSaving("error");
           alert("Não foi possível adicionar a opção: " + describeError(err, "structure"));
@@ -947,9 +1269,9 @@ function openDrawer(node, month, kindLabel) {
       }
       setSaving("saving");
       try {
-        await persistCellField(drawerCtx.id, drawerCtx.monthKey, f.key, select.value);
+        await drawerCtx.persistField(f.key, select.value);
         setSaving("saved");
-        openDrawer(node, useMonth, kindLabel);
+        ctx.onReopen();
       } catch (err) {
         setSaving("error");
         alert("Não foi possível salvar: " + describeError(err));
@@ -964,9 +1286,9 @@ function openDrawer(node, month, kindLabel) {
       if (!value) return;
       setSaving("saving");
       try {
-        await persistCellField(drawerCtx.id, drawerCtx.monthKey, f.key, "");
+        await drawerCtx.persistField(f.key, "");
         setSaving("saved");
-        openDrawer(node, useMonth, kindLabel);
+        ctx.onReopen();
       } catch (err) {
         setSaving("error");
         alert("Não foi possível limpar: " + describeError(err));
@@ -980,11 +1302,11 @@ function openDrawer(node, month, kindLabel) {
 
   const valorInput = document.getElementById("drawerValor");
   valorInput.value = cell.valorBaseTarget || "";
-  valorInput.oninput = () => persistValor(drawerCtx.id, drawerCtx.monthKey, valorInput.value);
+  valorInput.oninput = () => persistValor(valorInput.value);
 
   const obsInput = document.getElementById("drawerObservacoes");
   obsInput.value = cell.observacoes || "";
-  obsInput.oninput = () => persistObs(drawerCtx.id, drawerCtx.monthKey, obsInput.value);
+  obsInput.oninput = () => persistObs(obsInput.value);
 
   drawerEl.classList.add("drawer-open");
   drawerBackdrop.classList.add("backdrop-visible");
