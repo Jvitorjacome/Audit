@@ -24,11 +24,30 @@ painel) para logar — peça ao administrador para te cadastrar (ver `db/README.
 ## Identidade visual
 
 Redesenhado para soar institucional em vez de "produto colorido": uma única cor de marca
-(`--brand: #1479d6`) usada com moderação (links, barra de progresso, estado ativo dos filtros),
-tipografia Inter, e hierarquia por peso de fonte + indentação + um trilho monocromático à
-esquerda (mesma cor, opacidade decrescente por nível) em vez de 4 fundos coloridos diferentes.
-Status virou selo de texto (`Conforme`/`Não conforme`/`Pendente`) em vez de bolinhas — vermelho
-só aparece quando há de fato uma divergência a sinalizar.
+(`--brand: #1c5cab`, um azul fosco — mesmo passo da rampa sequencial azul usada nos gráficos do
+dashboard, não uma cor escolhida no olho) usada com moderação (links, barra de progresso, estado
+ativo dos filtros), tipografia Inter, e hierarquia por peso de fonte + indentação + um trilho
+monocromático à esquerda (mesma cor, opacidade decrescente por nível) em vez de 4 fundos
+coloridos diferentes. Status virou selo de texto (`Conforme`/`Não conforme`/`Pendente`) em vez de
+bolinhas — vermelho só aparece quando há de fato uma divergência a sinalizar.
+
+Um segundo tom, navy fosco (`--navy-900`/`--navy-800`), veste só o cabeçalho (faixa cheia,
+ícone + relógio de "Atualizado às...") e a tela de login — inspirado numa referência pessoal do
+administrador — sem virar cor de dado em lugar nenhum (gráficos e status continuam com as cores
+que já tinham, validadas pela régua de design de dataviz usada no projeto). Os cards do
+dashboard **Indicadores** ganharam ícone (num selo colorido, sempre acompanhado do rótulo — nunca
+só a cor, pra quem não distingue cor sozinha) e sombra suave, e entram na tela com uma animação
+de "aparecer ao rolar" (`IntersectionObserver`, respeita `prefers-reduced-motion`) — escopo só
+nessa aba: a árvore de Auditoria é uma grade de trabalho densa, reanimar linha de tabela a cada
+rolagem atrapalharia mais do que ajudaria ali.
+
+**Uma diferença deliberada** em relação à referência visual usada (um dashboard Lovable): lá,
+os gráficos de ranking (erros por setor, por funcionário...) pintam cada barra de uma cor
+diferente. Aqui todas ficam na mesma cor (azul da marca) — é uma única série (contagem de erros
+por categoria), e a régua de dataviz do projeto trata "colorir cada barra de uma métrica só" como
+anti-padrão (gasta o canal de identidade sem legenda nenhuma pra explicar o que cada cor
+significa). A textura "produto" (ícones, sombra, navy fosco, animação) veio da referência; a
+paleta dos gráficos ficou como já era.
 
 ## Arquivos
 

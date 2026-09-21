@@ -11,7 +11,10 @@
 const DASH_ALL = "__all__";
 
 const DASH_COLOR = {
-  blue: "#2a78d6",
+  // Passo mais escuro (mais "fosco") da mesma rampa sequencial azul da
+  // skill de dataviz — mesma família de cor da marca (styles.css --brand),
+  // só que documentada/validada, não escolhida no olho.
+  blue: "#1c5cab",
   good: "#0ca30c",
   warning: "#fab219",
   critical: "#d03b3b",
@@ -21,6 +24,52 @@ const DASH_COLOR = {
   textSecondary: "#52514e",
   textMuted: "#898781",
 };
+
+// Ícones monoline simples (sem depender de CDN de ícones) — só pros KPIs do
+// topo do dashboard, pra reforçar o significado (bom/ruim/dinheiro) sem
+// depender só da cor (a skill de dataviz exige ícone+rótulo pra cor de
+// status, nunca cor sozinha).
+const DASH_ICON = {
+  analyzed: '<path d="M21 12a9 9 0 1 1-3.2-6.9"/><path d="M21 4v5h-5"/>',
+  warning: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  check: '<path d="M12 22c5.5-1.5 9-6 9-11V5l-9-3-9 3v6c0 5 3.5 9.5 9 11Z"/><path d="m9 12 2 2 4-4"/>',
+  money: '<circle cx="12" cy="12" r="9"/><path d="M15 9.5c0-1-1.1-1.8-3-1.8s-3 .8-3 1.8 1 1.6 3 1.8 3 .9 3 1.9-1.1 1.8-3 1.8-3-.8-3-1.8"/><path d="M12 6.5v1.2M12 16.3v1.2"/>',
+};
+function dashIconSvg(name) {
+  return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${DASH_ICON[name] || ""}</svg>`;
+}
+
+// ---------- animação de entrada ao rolar (IntersectionObserver) ----------
+// Escopo deliberadamente só nesta aba: a árvore de Auditoria é uma grade de
+// trabalho densa (até centenas de linhas) — reanimar linhas de tabela a
+// cada rolagem atrapalharia mais do que ajudaria. Aqui, cartão por cartão,
+// é o mesmo efeito do print de referência.
+let dashRevealObserver = null;
+function dashObserveReveal(container) {
+  const els = container.querySelectorAll(".reveal");
+  const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reduceMotion) {
+    els.forEach((el) => el.classList.add("reveal-visible"));
+    return;
+  }
+  if (!dashRevealObserver) {
+    dashRevealObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("reveal-visible");
+            dashRevealObserver.unobserve(entry.target);
+          }
+        }
+      },
+      { threshold: 0.15, rootMargin: "0px 0px -40px 0px" }
+    );
+  }
+  els.forEach((el, i) => {
+    el.style.transitionDelay = Math.min(i * 45, 360) + "ms";
+    dashRevealObserver.observe(el);
+  });
+}
 
 function dashFormatCurrency(v) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -194,9 +243,15 @@ function computeDashboardMetrics(dataset, mesFilter, propFilter) {
 
 // ---------- construção de DOM (sem interpolar texto do banco em innerHTML) ----------
 
-function dashKpiCard(title, value, subtitle, variant) {
+function dashKpiCard(title, value, subtitle, variant, icon) {
   const card = document.createElement("div");
-  card.className = "dash-kpi" + (variant ? ` dash-kpi-${variant}` : "");
+  card.className = "dash-kpi reveal" + (variant ? ` dash-kpi-${variant}` : "");
+  if (icon) {
+    const iconEl = document.createElement("span");
+    iconEl.className = "dash-kpi-icon" + (variant ? ` dash-kpi-icon-${variant}` : "");
+    iconEl.innerHTML = dashIconSvg(icon);
+    card.appendChild(iconEl);
+  }
   const titleEl = document.createElement("p");
   titleEl.className = "dash-kpi-title";
   titleEl.textContent = title;
@@ -216,7 +271,7 @@ function dashKpiCard(title, value, subtitle, variant) {
 
 function dashChartCard(title, subtitle) {
   const card = document.createElement("div");
-  card.className = "dash-chart-card";
+  card.className = "dash-chart-card reveal";
   const head = document.createElement("div");
   head.className = "dash-chart-head";
   const titleEl = document.createElement("h3");
@@ -395,11 +450,11 @@ function renderDashboardBody(dataset) {
   // conformidade, impacto financeiro não corrigido e valores já corrigidos.
   const kpiGrid = document.createElement("div");
   kpiGrid.className = "dash-kpi-grid";
-  kpiGrid.appendChild(dashKpiCard("Total analisado", m.totalAnalyzed.toLocaleString("pt-BR"), m.monthsInScope.length + " mês(es) no escopo"));
-  kpiGrid.appendChild(dashKpiCard("Não conformidades", m.totalErros.toLocaleString("pt-BR"), `${m.taxaErroTotal.toFixed(2)}% de erro`, "critical"));
-  kpiGrid.appendChild(dashKpiCard("Taxa de conformidade", `${m.taxaConformidadeTotal.toFixed(1)}%`, "Itens conformes", "good"));
-  kpiGrid.appendChild(dashKpiCard("Impacto financeiro (não corrigido)", dashFormatCurrency(m.valorImpactado), 'Erros com "Corrigido = Não"', "critical"));
-  kpiGrid.appendChild(dashKpiCard("Valores corrigidos", dashFormatCurrency(m.valorCorrigido), 'Erros com "Corrigido = Sim"', "good"));
+  kpiGrid.appendChild(dashKpiCard("Total analisado", m.totalAnalyzed.toLocaleString("pt-BR"), m.monthsInScope.length + " mês(es) no escopo", null, "analyzed"));
+  kpiGrid.appendChild(dashKpiCard("Não conformidades", m.totalErros.toLocaleString("pt-BR"), `${m.taxaErroTotal.toFixed(2)}% de erro`, "critical", "warning"));
+  kpiGrid.appendChild(dashKpiCard("Taxa de conformidade", `${m.taxaConformidadeTotal.toFixed(1)}%`, "Itens conformes", "good", "check"));
+  kpiGrid.appendChild(dashKpiCard("Impacto financeiro (não corrigido)", dashFormatCurrency(m.valorImpactado), 'Erros com "Corrigido = Não"', "critical", "money"));
+  kpiGrid.appendChild(dashKpiCard("Valores corrigidos", dashFormatCurrency(m.valorCorrigido), 'Erros com "Corrigido = Sim"', "good", "money"));
   body.appendChild(kpiGrid);
 
   // Erros por setor / funcionário
@@ -419,7 +474,7 @@ function renderDashboardBody(dataset) {
     monthGrid.className = "dash-month-grid";
     for (const item of m.conformidadePorMes) {
       const card = document.createElement("div");
-      card.className = "dash-month-card";
+      card.className = "dash-month-card reveal";
       const label = document.createElement("p");
       label.className = "dash-month-label";
       label.textContent = item.mesLabel;
@@ -536,6 +591,8 @@ function renderDashboardBody(dataset) {
     tableCard.appendChild(dashEmptyNote("Nenhuma ocorrência para o filtro selecionado."));
   }
   body.appendChild(tableCard);
+
+  dashObserveReveal(body);
 }
 
 // ---------- abas ----------

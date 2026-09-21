@@ -5,8 +5,10 @@
   --border: #dde1e6;
   --text: #1a1d21;
   --text-muted: #6b7280;
-  --brand: #1479d6;
-  --brand-weak: #e6f0fb;
+  /* Azul fosco (não o azul vivo de antes) — mesma família de cor usada nos
+     gráficos (Chart.js em dashboard.js), pra marca e dados ficarem coerentes. */
+  --brand: #1c5cab;
+  --brand-weak: #e6edf7;
   --ok-bg: #e4f6ea;
   --ok-fg: #1f7a3d;
   --div-bg: #fdeaea;
@@ -15,8 +17,18 @@
   --unv-fg: #6b7280;
   --na-bg: #e7ecf7;
   --na-fg: #44548c;
-  --radius: 8px;
+  --radius: 10px;
   --shadow: 0 8px 24px rgba(20, 24, 32, 0.12);
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04), 0 6px 18px rgba(16, 24, 40, 0.06);
+  --shadow-card-hover: 0 2px 4px rgba(16, 24, 40, 0.06), 0 10px 26px rgba(16, 24, 40, 0.09);
+  /* Navy fosco — usado só no header/hero e na tela de login, pra dar o
+     acabamento "produto" do print de referência, sem virar a cor de dados. */
+  --navy-900: #0a1526;
+  --navy-800: #10233d;
+  --navy-700: #17304f;
+  --navy-text: #eef3fa;
+  --navy-text-muted: #9fb3cc;
+  --navy-border: rgba(255, 255, 255, 0.1);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -27,7 +39,7 @@
     --border: #2b3038;
     --text: #e7eaed;
     --text-muted: #9aa1ab;
-    --brand: #5fa8e8;
+    --brand: #6ea3e0;
     --brand-weak: #1c2b3d;
     --ok-bg: #123322;
     --ok-fg: #5fd88f;
@@ -38,6 +50,8 @@
     --na-bg: #1e2740;
     --na-fg: #9db0e8;
     --shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 18px rgba(0, 0, 0, 0.35);
+    --shadow-card-hover: 0 2px 4px rgba(0, 0, 0, 0.35), 0 10px 26px rgba(0, 0, 0, 0.4);
   }
 }
 
@@ -48,7 +62,7 @@
   --border: #2b3038;
   --text: #e7eaed;
   --text-muted: #9aa1ab;
-  --brand: #5fa8e8;
+  --brand: #6ea3e0;
   --brand-weak: #1c2b3d;
   --ok-bg: #123322;
   --ok-fg: #5fd88f;
@@ -59,6 +73,8 @@
   --na-bg: #1e2740;
   --na-fg: #9db0e8;
   --shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 18px rgba(0, 0, 0, 0.35);
+  --shadow-card-hover: 0 2px 4px rgba(0, 0, 0, 0.35), 0 10px 26px rgba(0, 0, 0, 0.4);
 }
 
 * { box-sizing: border-box; }
@@ -73,8 +89,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: "Inter", system-ui, -apple-system, sans-serif;
-  padding: 0 16px;
-  padding-block: 24px;
+  margin: 0;
 }
 
 .wrap {
@@ -83,20 +98,52 @@ body {
   display: flex;
   flex-direction: column;
   gap: 18px;
+  padding: 0 16px;
+  padding-block: 24px;
+}
+
+/* Header em faixa cheia (navy fosco), como no print de referência — fica
+   fora do `.wrap` (que limita a 1180px) pra encostar nas duas bordas da
+   tela; `.page-header-inner` recentra o conteúdo na mesma largura do resto. */
+.page-header {
+  background: linear-gradient(155deg, var(--navy-900), var(--navy-800) 70%, var(--navy-700));
+  color: var(--navy-text);
+  border-bottom: 1px solid var(--navy-border);
+}
+.page-header-inner {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 18px 16px;
+}
+
+.page-header-title { display: flex; align-items: flex-start; gap: 12px; }
+.page-header-icon {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--navy-border);
+  color: #7fb3f4;
 }
 
 .page-header h1 {
-  font-size: 1.4rem;
+  font-size: 1.3rem;
   font-weight: 600;
   margin: 0 0 4px;
   text-wrap: balance;
+  color: var(--navy-text);
+  letter-spacing: -0.01em;
 }
 
 .page-header p {
   margin: 0;
-  color: var(--text-muted);
-  font-size: 0.88rem;
-  max-width: 65ch;
+  color: var(--navy-text-muted);
+  font-size: 0.86rem;
+  max-width: 60ch;
 }
 
 .page-header-top {
@@ -114,10 +161,20 @@ body {
   flex-wrap: wrap;
 }
 
+.header-updated {
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--navy-text-muted);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--navy-border);
+  border-radius: 20px;
+  padding: 4px 10px;
+}
+
 .auth-user {
   font-size: 0.84rem;
   font-weight: 500;
-  color: var(--text);
+  color: var(--navy-text);
 }
 
 .role-badge {
@@ -127,10 +184,10 @@ body {
   letter-spacing: 0.04em;
   padding: 3px 8px;
   border-radius: 4px;
-  background: var(--unv-bg);
-  color: var(--unv-fg);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--navy-text-muted);
 }
-.role-badge-admin { background: var(--brand-weak); color: var(--brand); }
+.role-badge-admin { background: rgba(127, 179, 244, 0.18); color: #a9cdf7; }
 
 /* ---------- tela de login ---------- */
 
@@ -140,6 +197,7 @@ body {
   align-items: center;
   justify-content: center;
   padding: 24px;
+  background: radial-gradient(circle at 25% 15%, var(--navy-700), var(--navy-900) 65%);
 }
 
 .auth-card {
@@ -178,13 +236,6 @@ body {
   font-size: 0.8rem;
   color: var(--div-fg);
 }
-
-.btn-primary {
-  background: var(--brand);
-  border-color: var(--brand);
-  color: #fff;
-}
-.btn-primary:hover { color: #fff; opacity: 0.92; }
 
 .loading-note {
   padding: 24px;
@@ -287,6 +338,24 @@ body {
 }
 
 .btn:hover { border-color: var(--brand); color: var(--brand); }
+
+/* Depois de .btn de propósito: mesma especificidade (uma classe), e como
+   os dois botões usam class="btn btn-primary", quem vier por último no
+   arquivo é que decide o fundo/cor final — tinha um bug aqui em que
+   .btn-primary vinha ANTES de .btn no arquivo e nunca pintava o botão. */
+.btn-primary {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+}
+.btn-primary:hover { color: #fff; opacity: 0.92; border-color: var(--brand); }
+
+.btn-on-navy {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--navy-border);
+  color: var(--navy-text);
+}
+.btn-on-navy:hover { border-color: #7fb3f4; color: #a9cdf7; }
 .btn-danger:hover { border-color: var(--div-fg); color: var(--div-fg); }
 
 .summary {
@@ -295,8 +364,9 @@ body {
   flex-wrap: wrap;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius);
   padding: 14px 18px;
+  box-shadow: var(--shadow-card);
 }
 
 .stat { display: flex; flex-direction: column; gap: 2px; }
@@ -311,8 +381,9 @@ body {
 .table-scroll {
   overflow-x: auto;
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius);
   background: var(--surface);
+  box-shadow: var(--shadow-card);
 }
 
 .dre-table {
@@ -696,6 +767,20 @@ thead .col-account { background: var(--surface-2); z-index: 2; }
 
 /* ---------- Indicadores (dashboard) ---------- */
 
+/* Animação de entrada ao rolar (dashboard.js: IntersectionObserver liga
+   .reveal-visible quando o card entra na tela). Respeita
+   prefers-reduced-motion — nesse caso dashObserveReveal já entrega os
+   cards visíveis direto, sem depender desta transição. */
+.reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+.reveal-visible { opacity: 1; transform: translateY(0); }
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; transition: none; }
+}
+
 .dash-filters {
   display: flex;
   flex-wrap: wrap;
@@ -706,6 +791,7 @@ thead .col-account { background: var(--surface-2); z-index: 2; }
   border-radius: var(--radius);
   padding: 14px 16px;
   margin-bottom: 18px;
+  box-shadow: var(--shadow-card);
 }
 .dash-filters .field { min-width: 180px; }
 .dash-filters .btn { margin-bottom: 1px; }
@@ -722,13 +808,27 @@ thead .col-account { background: var(--surface-2); z-index: 2; }
 .dash-kpi {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 16px;
-  border-left: 3px solid var(--brand);
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: var(--shadow-card);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
 }
-.dash-kpi-good { border-left-color: #0ca30c; }
-.dash-kpi-warning { border-left-color: #fab219; }
-.dash-kpi-critical { border-left-color: #d03b3b; }
+.dash-kpi:hover { box-shadow: var(--shadow-card-hover); transform: translateY(-1px); }
+
+.dash-kpi-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  margin-bottom: 10px;
+  background: var(--brand-weak);
+  color: var(--brand);
+}
+.dash-kpi-icon-good { background: var(--ok-bg); color: var(--ok-fg); }
+.dash-kpi-icon-warning { background: color-mix(in srgb, #fab219 16%, var(--surface)); color: #9a6300; }
+.dash-kpi-icon-critical { background: var(--div-bg); color: var(--div-fg); }
 
 .dash-kpi-title {
   font-size: 0.68rem;
@@ -738,7 +838,7 @@ thead .col-account { background: var(--surface-2); z-index: 2; }
   color: var(--text-muted);
   margin: 0;
 }
-.dash-kpi-value { font-size: 1.5rem; font-weight: 700; margin: 6px 0 0; }
+.dash-kpi-value { font-size: 1.6rem; font-weight: 700; margin: 6px 0 0; letter-spacing: -0.01em; }
 .dash-kpi-subtitle { font-size: 0.76rem; color: var(--text-muted); margin: 4px 0 0; }
 
 .dash-chart-grid-2 {
@@ -752,8 +852,9 @@ thead .col-account { background: var(--surface-2); z-index: 2; }
 .dash-chart-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 14px;
   padding: 18px;
+  box-shadow: var(--shadow-card);
 }
 .dash-chart-head { margin-bottom: 14px; }
 .dash-chart-head h3 { font-size: 0.92rem; font-weight: 600; margin: 0; }
@@ -768,8 +869,9 @@ thead .col-account { background: var(--surface-2); z-index: 2; }
 .dash-month-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 12px;
   padding: 14px;
+  box-shadow: var(--shadow-card);
 }
 .dash-month-label { font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); margin: 0; }
 .dash-month-value { font-size: 1.35rem; font-weight: 700; margin: 6px 0 0; }
