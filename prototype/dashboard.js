@@ -10,19 +10,22 @@
 
 const DASH_ALL = "__all__";
 
+// O app é navy escuro sempre (não tem mais tema claro por padrão — ver
+// styles.css), então as cores do gráfico já saem direto no passo "dark" da
+// skill de dataviz (nunca escolhidas no olho): slot categórico 1 (azul) no
+// passo validado pra superfície escura, e as cores de status (bom/aviso/
+// crítico) são fixas — a própria skill documenta que os MESMOS quatro
+// hexs já valem tanto pra superfície clara quanto pra escura.
 const DASH_COLOR = {
-  // Passo mais escuro (mais "fosco") da mesma rampa sequencial azul da
-  // skill de dataviz — mesma família de cor da marca (styles.css --brand),
-  // só que documentada/validada, não escolhida no olho.
-  blue: "#1c5cab",
+  blue: "#3987e5",
   good: "#0ca30c",
   warning: "#fab219",
   critical: "#d03b3b",
-  grid: "#e1e0d9",
-  axis: "#c3c2b7",
-  textPrimary: "#0b0b0b",
-  textSecondary: "#52514e",
-  textMuted: "#898781",
+  grid: "rgba(255, 255, 255, 0.08)",
+  axis: "rgba(255, 255, 255, 0.2)",
+  textPrimary: "#eef3fa",
+  textSecondary: "#c7d5e8",
+  textMuted: "#8ea3bf",
 };
 
 // Ícones monoline simples (sem depender de CDN de ícones) — só pros KPIs do

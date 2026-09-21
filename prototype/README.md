@@ -23,23 +23,28 @@ painel) para logar — peça ao administrador para te cadastrar (ver `db/README.
 
 ## Identidade visual
 
-Redesenhado para soar institucional em vez de "produto colorido": uma única cor de marca
-(`--brand: #1c5cab`, um azul fosco — mesmo passo da rampa sequencial azul usada nos gráficos do
-dashboard, não uma cor escolhida no olho) usada com moderação (links, barra de progresso, estado
-ativo dos filtros), tipografia Inter, e hierarquia por peso de fonte + indentação + um trilho
-monocromático à esquerda (mesma cor, opacidade decrescente por nível) em vez de 4 fundos
-coloridos diferentes. Status virou selo de texto (`Conforme`/`Não conforme`/`Pendente`) em vez de
-bolinhas — vermelho só aparece quando há de fato uma divergência a sinalizar.
+O sistema inteiro (não só o cabeçalho) usa um tema navy fosco fixo — não depende mais do tema
+claro/escuro do sistema operacional, é sempre o mesmo visual pra todo mundo. `--bg` é o mesmo
+navy escuro da base do cabeçalho, e cada camada acima dele (cartão sobre o fundo, cabeçalho de
+tabela sobre o cartão) sobe um degrau de claridade — cartões não ficam soltos, ficam "flutuando"
+sobre o fundo escuro com uma sombra e uma borda bem sutil (`rgba(255,255,255,.1)`) separando as
+camadas, o mesmo truque visual de qualquer produto dark-first (Linear, Vercel...). Cor de marca
+(`--brand: #6ea3e0`) usada com moderação (links, barra de progresso, estado ativo dos filtros),
+tipografia Inter, e hierarquia por peso de fonte + indentação + um trilho monocromático à esquerda
+(mesma cor, opacidade decrescente por nível) em vez de 4 fundos coloridos diferentes. Status virou
+selo de texto (`Conforme`/`Não conforme`/`Pendente`) em vez de bolinhas — vermelho só aparece
+quando há de fato uma divergência a sinalizar. O tema claro original ainda existe no CSS, atrás de
+`:root[data-theme="light"]` — hoje nada no app liga esse atributo, então na prática o navy é o
+único tema; fica preservado ali caso um toggle claro/escuro seja adicionado no futuro.
 
-Um segundo tom, navy fosco (`--navy-900`/`--navy-800`), veste só o cabeçalho (faixa cheia,
-ícone + relógio de "Atualizado às...") e a tela de login — inspirado numa referência pessoal do
-administrador — sem virar cor de dado em lugar nenhum (gráficos e status continuam com as cores
-que já tinham, validadas pela régua de design de dataviz usada no projeto). Os cards do
-dashboard **Indicadores** ganharam ícone (num selo colorido, sempre acompanhado do rótulo — nunca
-só a cor, pra quem não distingue cor sozinha) e sombra suave, e entram na tela com uma animação
-de "aparecer ao rolar" (`IntersectionObserver`, respeita `prefers-reduced-motion`) — escopo só
-nessa aba: a árvore de Auditoria é uma grade de trabalho densa, reanimar linha de tabela a cada
-rolagem atrapalharia mais do que ajudaria ali.
+Os cards do dashboard **Indicadores** ganharam ícone (num selo colorido, sempre acompanhado do
+rótulo — nunca só a cor, pra quem não distingue cor sozinha) e sombra suave, e entram na tela com
+uma animação de "aparecer ao rolar" (`IntersectionObserver`, respeita `prefers-reduced-motion`) —
+escopo só nessa aba: a árvore de Auditoria é uma grade de trabalho densa, reanimar linha de tabela
+a cada rolagem atrapalharia mais do que ajudaria ali. As cores dos gráficos (Chart.js, em
+`dashboard.js`) foram ajustadas pro passo validado pra superfície escura da régua de dataviz do
+projeto (grid/eixo/texto claros, azul de série num tom mais vivo) — sem isso, ficariam ilegíveis
+(texto escuro sobre fundo escuro) agora que o navy é sempre o tema.
 
 **Uma diferença deliberada** em relação à referência visual usada (um dashboard Lovable): lá,
 os gráficos de ranking (erros por setor, por funcionário...) pintam cada barra de uma cor

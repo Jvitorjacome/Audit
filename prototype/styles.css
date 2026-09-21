@@ -1,12 +1,52 @@
+/* Navy fosco em todo o sistema, sempre ligado (não depende mais do tema do
+   SO) — pedido explícito, a partir de como ficou o cabeçalho. `--bg` é o
+   mesmo navy da base do cabeçalho, pra emendar sem costura visível;
+   `--surface`/`--surface-2` sobem um degrau de claridade a cada camada
+   (cartão sobre o fundo, cabeçalho de tabela sobre o cartão), o mesmo
+   truque de hierarquia por camada que qualquer produto dark-first usa. */
 :root {
+  --bg: #0a1526;
+  --surface: #10233d;
+  --surface-2: #152943;
+  --border: rgba(255, 255, 255, 0.1);
+  --text: #eef3fa;
+  --text-muted: #9fb3cc;
+  --brand: #6ea3e0;
+  --brand-weak: #1c2b3d;
+  --ok-bg: #123322;
+  --ok-fg: #5fd88f;
+  --div-bg: #3a1518;
+  --div-fg: #f2867f;
+  --unv-bg: #182740;
+  --unv-fg: #9fb3cc;
+  --na-bg: #1e2740;
+  --na-fg: #9db0e8;
+  --radius: 10px;
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 18px rgba(0, 0, 0, 0.35);
+  --shadow-card-hover: 0 2px 4px rgba(0, 0, 0, 0.35), 0 10px 26px rgba(0, 0, 0, 0.4);
+  /* Mesmos tokens navy usados no cabeçalho/login (ver page-header) —
+     ficam à parte porque esses dois lugares sempre usam o navy mais escuro
+     da escala, mesmo que algum dia o resto do app ganhe um tema claro de
+     volta atrás de um toggle. */
+  --navy-900: #0a1526;
+  --navy-800: #10233d;
+  --navy-700: #17304f;
+  --navy-text: #eef3fa;
+  --navy-text-muted: #9fb3cc;
+  --navy-border: rgba(255, 255, 255, 0.1);
+}
+
+/* Tema claro original, preservado como opt-in (`data-theme="light"`) caso
+   um toggle seja adicionado depois — hoje nada no app define esse
+   atributo, então na prática o navy acima é o único tema ativo. */
+:root[data-theme="light"] {
   --bg: #f5f6f7;
   --surface: #ffffff;
   --surface-2: #eef0f2;
   --border: #dde1e6;
   --text: #1a1d21;
   --text-muted: #6b7280;
-  /* Azul fosco (não o azul vivo de antes) — mesma família de cor usada nos
-     gráficos (Chart.js em dashboard.js), pra marca e dados ficarem coerentes. */
   --brand: #1c5cab;
   --brand-weak: #e6edf7;
   --ok-bg: #e4f6ea;
@@ -17,64 +57,9 @@
   --unv-fg: #6b7280;
   --na-bg: #e7ecf7;
   --na-fg: #44548c;
-  --radius: 10px;
   --shadow: 0 8px 24px rgba(20, 24, 32, 0.12);
   --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04), 0 6px 18px rgba(16, 24, 40, 0.06);
   --shadow-card-hover: 0 2px 4px rgba(16, 24, 40, 0.06), 0 10px 26px rgba(16, 24, 40, 0.09);
-  /* Navy fosco — usado só no header/hero e na tela de login, pra dar o
-     acabamento "produto" do print de referência, sem virar a cor de dados. */
-  --navy-900: #0a1526;
-  --navy-800: #10233d;
-  --navy-700: #17304f;
-  --navy-text: #eef3fa;
-  --navy-text-muted: #9fb3cc;
-  --navy-border: rgba(255, 255, 255, 0.1);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #12151a;
-    --surface: #1a1e24;
-    --surface-2: #20252c;
-    --border: #2b3038;
-    --text: #e7eaed;
-    --text-muted: #9aa1ab;
-    --brand: #6ea3e0;
-    --brand-weak: #1c2b3d;
-    --ok-bg: #123322;
-    --ok-fg: #5fd88f;
-    --div-bg: #3a1518;
-    --div-fg: #f2867f;
-    --unv-bg: #20252c;
-    --unv-fg: #9aa1ab;
-    --na-bg: #1e2740;
-    --na-fg: #9db0e8;
-    --shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 18px rgba(0, 0, 0, 0.35);
-    --shadow-card-hover: 0 2px 4px rgba(0, 0, 0, 0.35), 0 10px 26px rgba(0, 0, 0, 0.4);
-  }
-}
-
-:root[data-theme="dark"] {
-  --bg: #12151a;
-  --surface: #1a1e24;
-  --surface-2: #20252c;
-  --border: #2b3038;
-  --text: #e7eaed;
-  --text-muted: #9aa1ab;
-  --brand: #6ea3e0;
-  --brand-weak: #1c2b3d;
-  --ok-bg: #123322;
-  --ok-fg: #5fd88f;
-  --div-bg: #3a1518;
-  --div-fg: #f2867f;
-  --unv-bg: #20252c;
-  --unv-fg: #9aa1ab;
-  --na-bg: #1e2740;
-  --na-fg: #9db0e8;
-  --shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 18px rgba(0, 0, 0, 0.35);
-  --shadow-card-hover: 0 2px 4px rgba(0, 0, 0, 0.35), 0 10px 26px rgba(0, 0, 0, 0.4);
 }
 
 * { box-sizing: border-box; }
@@ -827,7 +812,10 @@ thead .col-account { background: var(--surface-2); z-index: 2; }
   color: var(--brand);
 }
 .dash-kpi-icon-good { background: var(--ok-bg); color: var(--ok-fg); }
-.dash-kpi-icon-warning { background: color-mix(in srgb, #fab219 16%, var(--surface)); color: #9a6300; }
+/* #fab219 é o "warning" fixo da régua de dataviz (nunca muda por tema) —
+   9.49:1 de contraste na superfície escura, então funciona bem como ÍCONE
+   aqui mesmo sem um --warning-fg próprio no tema. */
+.dash-kpi-icon-warning { background: color-mix(in srgb, #fab219 20%, var(--surface)); color: #fab219; }
 .dash-kpi-icon-critical { background: var(--div-bg); color: var(--div-fg); }
 
 .dash-kpi-title {
