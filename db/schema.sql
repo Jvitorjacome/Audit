@@ -56,12 +56,23 @@ create table sections (
   created_by uuid references profiles(id)
 );
 
+-- `is_active` = ocultar/mostrar manual (reversível, sem relação com mês —
+-- mesmo padrão de audit_fields.is_active). `retired_year`/`retired_month` =
+-- "retirado a partir de" (ex.: propriedade que a QAVI parou de administrar):
+-- NUNCA apaga a linha nem o que existe abaixo dela (states/properties/
+-- cost_centers/audit_fields/audit_status inteiros continuam no banco, pro
+-- histórico e os indicadores de meses anteriores não se perderem) — só marca
+-- a partir de quando ela para de aparecer na árvore da aba Auditoria pra
+-- frente. Ver prototype/app.js (retireNode) pra a regra de visibilidade.
 create table states (
   id uuid primary key default gen_random_uuid(),
   section_id uuid not null references sections(id) on delete cascade,
   name text not null, -- ex.: RN, PB, AL, PI
   sort_order int not null default 0,
   source_row int,
+  is_active boolean not null default true,
+  retired_year int,
+  retired_month int check (retired_month between 1 and 12),
   created_at timestamptz not null default now(),
   created_by uuid references profiles(id)
 );
@@ -72,6 +83,9 @@ create table properties (
   name text not null, -- ex.: Ma Plage, Gaudium
   sort_order int not null default 0,
   source_row int,
+  is_active boolean not null default true,
+  retired_year int,
+  retired_month int check (retired_month between 1 and 12),
   created_at timestamptz not null default now(),
   created_by uuid references profiles(id)
 );
@@ -82,6 +96,9 @@ create table cost_centers (
   name text not null, -- ex.: Administrativo, Limpeza, Lavanderia
   sort_order int not null default 0,
   source_row int,
+  is_active boolean not null default true,
+  retired_year int,
+  retired_month int check (retired_month between 1 and 12),
   created_at timestamptz not null default now(),
   created_by uuid references profiles(id)
 );

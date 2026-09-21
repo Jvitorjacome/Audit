@@ -82,12 +82,12 @@ const KIND_LABEL = { section: "Seção", channel: "Estado", property: "Proprieda
 const KIND_ADD_LABEL = { section: "Estado", channel: "Propriedade", property: "Centro de custo", centro: "Campo" };
 
 function makeNode(kind, name, id, row = null) {
-  const base = { id, name, row };
+  const base = { id, name, row, isActive: true, retiredYear: null, retiredMonth: null };
   if (kind === "section") return { ...base, channels: [] };
   if (kind === "channel") return { ...base, properties: [] };
   if (kind === "property") return { ...base, centros: [] };
   if (kind === "centro") return { ...base, campos: [] };
-  return { ...base, isActive: true }; // campo: leaf
+  return { id, name, row, isActive: true }; // campo: leaf, sem retirada
 }
 
 function walkTree(nodes, kind, visit) {
@@ -331,6 +331,18 @@ function countDescendantNodes(node, kind) {
   return kids.length + kids.reduce((sum, k) => sum + countDescendantNodes(k, nextKind), 0);
 }
 
+// Estado/Propriedade/Centro de custo "retirado a partir de" um mês (ver
+// retireNode) fica escondido da árvore só quando NENHUM dos meses
+// selecionados no filtro atual é anterior ao corte — se pelo menos um mês
+// visível ainda é de antes da retirada, continua aparecendo (pra revisar o
+// histórico daquele período). `months` é a lista já filtrada por
+// state.visibleMonths (visibleMonthList()).
+function isRetiredForVisibleMonths(node, months) {
+  if (node.retiredMonth == null) return false;
+  const retiredYear = node.retiredYear == null ? YEAR : node.retiredYear;
+  return months.every((m) => (YEAR === retiredYear ? m.number >= node.retiredMonth : YEAR > retiredYear));
+}
+
 // ---------- Supabase: carregar árvore + status ----------
 
 function buildTree(sections, states, properties, costCenters, auditFields, showHidden) {
@@ -339,22 +351,51 @@ function buildTree(sections, states, properties, costCenters, auditFields, showH
   const costCentersByProperty = groupBy(costCenters, "property_id");
   const auditFieldsByCostCenter = groupBy(auditFields, "cost_center_id");
 
+  function buildCampos(costCenterId) {
+    return (auditFieldsByCostCenter[costCenterId] || [])
+      .filter((af) => showHidden || af.is_active !== false)
+      .map((af) => ({
+        id: af.id, name: af.name, row: af.source_row, isActive: af.is_active !== false,
+      }));
+  }
+
+  function buildCentros(propertyId) {
+    return (costCentersByProperty[propertyId] || [])
+      .filter((cc) => showHidden || cc.is_active !== false)
+      .map((cc) => ({
+        id: cc.id, name: cc.name, row: cc.source_row,
+        isActive: cc.is_active !== false, retiredYear: cc.retired_year, retiredMonth: cc.retired_month,
+        campos: buildCampos(cc.id),
+      }));
+  }
+
+  function buildProperties(stateId) {
+    return (propertiesByState[stateId] || [])
+      .filter((p) => showHidden || p.is_active !== false)
+      .map((p) => ({
+        id: p.id, name: p.name, row: p.source_row,
+        isActive: p.is_active !== false, retiredYear: p.retired_year, retiredMonth: p.retired_month,
+        centros: buildCentros(p.id),
+      }));
+  }
+
+  function buildChannels(sectionId) {
+    return (statesBySection[sectionId] || [])
+      .filter((st) => showHidden || st.is_active !== false)
+      .map((st) => ({
+        id: st.id, name: st.name, row: st.source_row,
+        isActive: st.is_active !== false, retiredYear: st.retired_year, retiredMonth: st.retired_month,
+        properties: buildProperties(st.id),
+      }));
+  }
+
+  // Oculto (is_active=false) some daqui — igual ao campo já fazia. Retirado
+  // (retired_month) NÃO é filtrado aqui: continua em state.tree sempre
+  // (nunca sai dos indicadores/histórico), só é escondido na hora de
+  // renderizar a árvore da aba Auditoria (ver isRetiredForVisibleMonths).
   return sections.map((s) => ({
     id: s.id, name: s.name, row: s.source_row,
-    channels: (statesBySection[s.id] || []).map((st) => ({
-      id: st.id, name: st.name, row: st.source_row,
-      properties: (propertiesByState[st.id] || []).map((p) => ({
-        id: p.id, name: p.name, row: p.source_row,
-        centros: (costCentersByProperty[p.id] || []).map((cc) => ({
-          id: cc.id, name: cc.name, row: cc.source_row,
-          campos: (auditFieldsByCostCenter[cc.id] || [])
-            .filter((af) => showHidden || af.is_active !== false)
-            .map((af) => ({
-              id: af.id, name: af.name, row: af.source_row, isActive: af.is_active !== false,
-            })),
-        })),
-      })),
-    })),
+    channels: buildChannels(s.id),
   }));
 }
 
@@ -469,9 +510,29 @@ async function setCampoActive(id, isActive) {
   if (error) throw error;
 }
 
-async function deleteNode(kind, id) {
+// Ocultar/mostrar Estado, Propriedade ou Centro de custo (reversível, sem
+// relação com mês) — mesma ideia de setCampoActive, generalizada pros 3
+// níveis de estrutura que agora também têm is_active (migração 009).
+async function setNodeActive(kind, id, isActive) {
   const cfg = HIERARCHY[kind];
-  const { error } = await sb.from(cfg.table).delete().eq("id", id);
+  const { error } = await sb.from(cfg.table).update({ is_active: isActive }).eq("id", id);
+  if (error) throw error;
+}
+
+// Substitui o antigo deleteNode (DELETE de verdade, que levava junto todo o
+// histórico/indicadores de tudo abaixo). Grava só a partir de qual mês o
+// item para de existir — a linha e tudo abaixo dela continuam intactas no
+// banco pra sempre, só somem da árvore da aba Auditoria dali pra frente (ver
+// isRetiredForVisibleMonths em app.js).
+async function retireNode(kind, id, year, month) {
+  const cfg = HIERARCHY[kind];
+  const { error } = await sb.from(cfg.table).update({ retired_year: year, retired_month: month }).eq("id", id);
+  if (error) throw error;
+}
+
+async function reactivateNode(kind, id) {
+  const cfg = HIERARCHY[kind];
+  const { error } = await sb.from(cfg.table).update({ retired_year: null, retired_month: null }).eq("id", id);
   if (error) throw error;
 }
 
@@ -622,13 +683,23 @@ function renderTreeTable() {
   const tbody = document.createElement("tbody");
 
   function renderNode(node, kind, depth, parentArray) {
+    // Retirado a partir de um mês que já cobre TODO o filtro de mês atual
+    // (nenhum mês selecionado é anterior ao corte) → some da árvore, mas
+    // continua em state.tree pra sempre (nunca some dos indicadores nem do
+    // histórico — só não é mais renderizado aqui). "Mostrar campos ocultos"
+    // revela de novo, igual ao oculto manual. Ver retireNode/reactivateNode.
+    if (kind !== "campo" && kind !== "section" && !state.showHidden && isRetiredForVisibleMonths(node, months)) {
+      return;
+    }
     const kids = childrenOf(node, kind);
     const nextKind = childKind(kind);
     const hasKids = Array.isArray(kids);
     const collapsed = !!state.collapsed[node.id];
 
     const tr = document.createElement("tr");
-    tr.className = `row-tree row-depth-${Math.min(depth, 5)} row-kind-${kind}` + (node.isActive === false ? " row-inactive" : "");
+    tr.className =
+      `row-tree row-depth-${Math.min(depth, 5)} row-kind-${kind}` +
+      (node.isActive === false || node.retiredMonth != null ? " row-inactive" : "");
     const tdName = document.createElement("td");
     tdName.className = "col-account";
     tdName.style.paddingLeft = `${10 + depth * 20}px`;
@@ -665,11 +736,18 @@ function renderTreeTable() {
     nameSpan.title = `${KIND_LABEL[kind]}${node.row ? " · linha " + node.row + " na planilha original" : " · adicionado neste sistema"}`;
     tdName.appendChild(nameSpan);
 
-    if (kind === "campo" && node.isActive === false) {
+    if (node.isActive === false) {
       const hiddenBadge = document.createElement("span");
       hiddenBadge.className = "node-count";
       hiddenBadge.textContent = " (oculto)";
       tdName.appendChild(hiddenBadge);
+    }
+    if (kind !== "campo" && node.retiredMonth != null) {
+      const retiredBadge = document.createElement("span");
+      retiredBadge.className = "node-count";
+      const monthLabel = (MONTH_BY_NUMBER[node.retiredMonth] || {}).label || node.retiredMonth;
+      retiredBadge.textContent = ` (retirado a partir de ${monthLabel}/${node.retiredYear || YEAR})`;
+      tdName.appendChild(retiredBadge);
     }
 
     if (hasKids) {
@@ -816,29 +894,100 @@ function renderTreeTable() {
     // inteiro de uma vez. Pra aposentar o campo em todos os meses, use
     // ocultar (🗕).
     if (kind !== "campo" && kind !== "section" && parentArray && isAdmin) {
-      const delBtn = document.createElement("button");
-      delBtn.type = "button";
-      delBtn.className = "row-delete";
-      const nested = hasKids ? countDescendantNodes(node, kind) : 0;
-      delBtn.title = nested > 0 ? `Remover (leva junto ${nested} item(ns) abaixo)` : `Remover ${KIND_LABEL[kind].toLowerCase()}`;
-      delBtn.textContent = "×";
-      delBtn.addEventListener("click", async (e) => {
+      // Ocultar/mostrar (reversível, sem relação com mês) — mesmo padrão do
+      // campo, agora também em Estado/Propriedade/Centro de custo.
+      const toggleBtn = document.createElement("button");
+      toggleBtn.type = "button";
+      toggleBtn.className = "row-toggle-active";
+      const wasActive = node.isActive !== false;
+      toggleBtn.title = wasActive
+        ? `Ocultar ${KIND_LABEL[kind].toLowerCase()} (some da árvore, sem apagar nada)`
+        : `Mostrar ${KIND_LABEL[kind].toLowerCase()} de novo`;
+      toggleBtn.textContent = wasActive ? "🗕" : "🗗";
+      toggleBtn.addEventListener("click", async (e) => {
         e.stopPropagation();
-        const warn = nested > 0 ? ` Isso remove também os ${nested} item(ns) dentro dele/dela.` : "";
-        if (!confirm(`Remover "${node.name}" (${KIND_LABEL[kind]})?${warn}`)) return;
-        delBtn.disabled = true;
+        toggleBtn.disabled = true;
         try {
-          await deleteNode(kind, node.id);
-          const idx = parentArray.indexOf(node);
-          if (idx >= 0) parentArray.splice(idx, 1);
+          await setNodeActive(kind, node.id, !wasActive);
+          node.isActive = !wasActive;
+          if (!state.showHidden && wasActive) {
+            const idx = parentArray.indexOf(node);
+            if (idx >= 0) parentArray.splice(idx, 1);
+          }
           renderTreeTable();
           renderSummary();
         } catch (err) {
-          alert("Não foi possível remover: " + describeError(err, "structure"));
-          delBtn.disabled = false;
+          alert("Não foi possível " + (wasActive ? "ocultar" : "mostrar") + ": " + describeError(err, "structure"));
+        } finally {
+          toggleBtn.disabled = false;
         }
       });
-      tdActions.appendChild(delBtn);
+      tdActions.appendChild(toggleBtn);
+
+      // × não apaga mais de verdade (isso destruía o histórico/indicadores
+      // de tudo que existia embaixo — audit_status incluso). Em vez disso
+      // grava "retirado a partir do mês X": a linha (e tudo abaixo dela)
+      // continua no banco intacta, só some da árvore quando NENHUM dos
+      // meses selecionados no filtro é anterior a esse mês (ver
+      // isRetiredForVisibleMonths, chamado lá em cima antes de renderizar
+      // esta linha). Enquanto estiver "retirado", o botão vira ↺ (reativar).
+      const nested = hasKids ? countDescendantNodes(node, kind) : 0;
+      const isRetired = node.retiredMonth != null;
+      const retireBtn = document.createElement("button");
+      retireBtn.type = "button";
+      retireBtn.className = "row-delete";
+      retireBtn.textContent = isRetired ? "↺" : "×";
+      retireBtn.title = isRetired
+        ? `Reativar ${KIND_LABEL[kind].toLowerCase()} (remove a data de retirada)`
+        : nested > 0
+        ? `Retirar a partir de um mês (leva junto ${nested} item(ns) abaixo)`
+        : `Retirar ${KIND_LABEL[kind].toLowerCase()} a partir de um mês`;
+      retireBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        retireBtn.disabled = true;
+        try {
+          if (isRetired) {
+            if (!confirm(`Reativar "${node.name}"? Ela volta a aparecer normalmente em todos os meses.`)) {
+              retireBtn.disabled = false;
+              return;
+            }
+            await reactivateNode(kind, node.id);
+            node.retiredYear = null;
+            node.retiredMonth = null;
+          } else {
+            const monthsHint = MONTHS.map((m) => `${m.number}-${m.label}`).join(", ");
+            const monthRaw = prompt(
+              `A partir de qual mês "${node.name}" deixa de existir (não aparece mais a partir dele)?\n` +
+                `O histórico e os indicadores dos meses anteriores continuam intactos — nada é apagado.\n${monthsHint}`
+            );
+            if (!monthRaw || !monthRaw.trim()) {
+              retireBtn.disabled = false;
+              return;
+            }
+            const monthDef = MONTH_BY_NUMBER[parseInt(monthRaw.trim(), 10)];
+            if (!monthDef) {
+              alert("Mês inválido — digite um número de 1 a 12.");
+              retireBtn.disabled = false;
+              return;
+            }
+            const warn = nested > 0 ? ` Some junto da árvore com os ${nested} item(ns) dentro dele/dela.` : "";
+            if (!confirm(`Retirar "${node.name}" a partir de ${monthDef.label}?${warn}`)) {
+              retireBtn.disabled = false;
+              return;
+            }
+            await retireNode(kind, node.id, YEAR, monthDef.number);
+            node.retiredYear = YEAR;
+            node.retiredMonth = monthDef.number;
+          }
+          renderTreeTable();
+          renderSummary();
+        } catch (err) {
+          alert("Não foi possível salvar: " + describeError(err, "structure"));
+        } finally {
+          retireBtn.disabled = false;
+        }
+      });
+      tdActions.appendChild(retireBtn);
     }
     tr.appendChild(tdActions);
     tbody.appendChild(tr);
@@ -1601,7 +1750,7 @@ function renderAuthBar() {
 
   const toggleHiddenBtn = document.getElementById("btnToggleHidden");
   toggleHiddenBtn.hidden = !isAdmin;
-  toggleHiddenBtn.textContent = state.showHidden ? "Esconder campos ocultos" : "Mostrar campos ocultos";
+  toggleHiddenBtn.textContent = state.showHidden ? "Esconder itens ocultos/retirados" : "Mostrar itens ocultos/retirados";
 
   document.getElementById("btnCreateItem").hidden = !isAdmin;
 }

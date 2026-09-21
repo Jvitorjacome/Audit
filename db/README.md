@@ -19,6 +19,22 @@ projeto Supabase de produção da QAVI** ("Auditoria - Qavi", projeto
   contém o resultado de todas elas — só use a pasta `migrations/` se estiver
   aplicando em um projeto que já rodava uma versão anterior do schema.
 
+### `migrations/009_retire_and_hide_states_properties_cost_centers.sql`
+
+Já aplicada. Antes, apagar um Estado, Propriedade ou Centro de custo era um DELETE de
+verdade — cascata que levava junto tudo abaixo (`audit_fields`, `audit_status`,
+`audit_status_history`), destruindo o histórico/indicadores de meses já auditados.
+Agora `states`/`properties`/`cost_centers` ganham as mesmas duas colunas que
+`audit_fields.is_active` já tinha, mais uma nova:
+- `is_active` — ocultar/mostrar manual, reversível, sem relação com mês (mesmo padrão
+  do campo).
+- `retired_year`/`retired_month` — "retirado a partir de": a linha (e tudo abaixo
+  dela) continua intacta no banco pra sempre; só marca a partir de quando ela para de
+  aparecer na árvore da aba Auditoria. O **×** na interface passa a gravar isso em vez
+  de fazer DELETE — ver `retireNode`/`isRetiredForVisibleMonths` em `prototype/app.js`.
+  Indicadores nunca filtra por isso, então o histórico de antes da retirada continua
+  contando normalmente.
+
 ### `migrations/008_leitor_role_readonly.sql`
 
 Já aplicada. Novo papel `leitor`: lê tudo (a árvore inteira, status, contas
