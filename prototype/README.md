@@ -23,36 +23,46 @@ painel) para logar — peça ao administrador para te cadastrar (ver `db/README.
 
 ## Identidade visual
 
-O sistema inteiro (não só o cabeçalho) usa um tema navy fosco fixo — não depende mais do tema
-claro/escuro do sistema operacional, é sempre o mesmo visual pra todo mundo. `--bg` é o mesmo
-navy escuro da base do cabeçalho, e cada camada acima dele (cartão sobre o fundo, cabeçalho de
-tabela sobre o cartão) sobe um degrau de claridade — cartões não ficam soltos, ficam "flutuando"
-sobre o fundo escuro com uma sombra e uma borda bem sutil (`rgba(255,255,255,.1)`) separando as
-camadas, o mesmo truque visual de qualquer produto dark-first (Linear, Vercel...). Cor de marca
-(`--brand: #6ea3e0`) usada com moderação (links, barra de progresso, estado ativo dos filtros),
-tipografia Inter, e hierarquia por peso de fonte + indentação + um trilho monocromático à esquerda
-(mesma cor, opacidade decrescente por nível) em vez de 4 fundos coloridos diferentes. Status virou
-selo de texto (`Conforme`/`Não conforme`/`Pendente`) em vez de bolinhas — vermelho só aparece
-quando há de fato uma divergência a sinalizar. O tema claro original ainda existe no CSS, atrás de
-`:root[data-theme="light"]` — hoje nada no app liga esse atributo, então na prática o navy é o
-único tema; fica preservado ali caso um toggle claro/escuro seja adicionado no futuro.
+Ultraminimalista, inspirado em Claude.ai/Stripe — fundo branco-sujo limpo (`--bg: #f9f9fb`),
+texto e estrutura em azul-marinho (`--navy: #0a192f`), e ciano elétrico (`--accent: #00e5ff`) só
+pra detalhe: trilho de 2px à esquerda da árvore, preenchimento das barras de progresso, sublinhado
+da aba ativa, anel de foco. Ciano nunca vira cor de texto corrido (ciano claro sobre fundo claro
+não tem contraste pra isso) — pra link/ícone/rótulo que precisa ser lido, usa `--brand: #00798f`,
+um passo mais escuro da mesma família. O cabeçalho é claro como o resto do app (não uma faixa
+navy cheia) — o navy aparece como detalhe no selo do ícone, não como um bloco grande de cor; é
+menos uma camada visual competindo por atenção, e o "ultraminimalista" pedido é sobretudo isso:
+poucas cores, pouca sombra, pouca borda, bastante espaço em branco.
 
-Os cards do dashboard **Indicadores** ganharam ícone (num selo colorido, sempre acompanhado do
-rótulo — nunca só a cor, pra quem não distingue cor sozinha) e sombra suave, e entram na tela com
-uma animação de "aparecer ao rolar" (`IntersectionObserver`, respeita `prefers-reduced-motion`) —
-escopo só nessa aba: a árvore de Auditoria é uma grade de trabalho densa, reanimar linha de tabela
-a cada rolagem atrapalharia mais do que ajudaria ali. As cores dos gráficos (Chart.js, em
-`dashboard.js`) foram ajustadas pro passo validado pra superfície escura da régua de dataviz do
-projeto (grid/eixo/texto claros, azul de série num tom mais vivo) — sem isso, ficariam ilegíveis
-(texto escuro sobre fundo escuro) agora que o navy é sempre o tema.
+**Declutter da árvore de Auditoria** (era a maior fonte de "poluição" visual): os botões de ação
+por linha (✎ renomear, 🗕 ocultar, × remover, + adicionar) e o × de apagar em cada célula de mês
+ficavam sempre visíveis, em toda linha, o tempo todo. Agora ficam em opacidade baixa por padrão e
+só "acendem" no hover da linha/célula (ou no foco, pra quem navega por teclado) — continuam
+descobríveis (nunca em opacidade zero, funciona em touch), mas não competem visualmente com os
+dados enquanto você só está lendo a tabela. As faixas de fundo coloridas atrás das linhas de Seção/
+Estado (que existiam antes) saíram — hierarquia agora é só peso de fonte + indentação + o trilho
+fino de 2px, sem fundo tingido atrás de cada nível.
 
-**Uma diferença deliberada** em relação à referência visual usada (um dashboard Lovable): lá,
-os gráficos de ranking (erros por setor, por funcionário...) pintam cada barra de uma cor
-diferente. Aqui todas ficam na mesma cor (azul da marca) — é uma única série (contagem de erros
-por categoria), e a régua de dataviz do projeto trata "colorir cada barra de uma métrica só" como
-anti-padrão (gasta o canal de identidade sem legenda nenhuma pra explicar o que cada cor
-significa). A textura "produto" (ícones, sombra, navy fosco, animação) veio da referência; a
-paleta dos gráficos ficou como já era.
+Cor de marca usada com moderação, tipografia Inter, hierarquia por peso de fonte + indentação.
+Status continua como selo de texto (`Conforme`/`Não conforme`/`Pendente`) — vermelho só aparece
+quando há de fato uma divergência a sinalizar.
+
+Os cards do dashboard **Indicadores** têm ícone (num selo colorido, sempre acompanhado do
+rótulo — nunca só a cor, pra quem não distingue cor sozinha), sombra bem sutil (quase
+imperceptível, ao estilo Stripe) e entram na tela com uma animação de "aparecer ao rolar"
+(`IntersectionObserver`, respeita `prefers-reduced-motion`) — escopo só nessa aba: a árvore de
+Auditoria é uma grade de trabalho densa, reanimar linha de tabela a cada rolagem atrapalharia mais
+do que ajudaria ali.
+
+**Duas diferenças deliberadas** em relação às referências usadas:
+- **Cor dos gráficos**: o ciano elétrico da marca não entra nas cores de dado do dashboard
+  (Chart.js, em `dashboard.js`) — ele não é um hex validado pela régua de dataviz do projeto pra
+  ser cor categórica de gráfico (só validado pra interface). Os gráficos continuam no azul do
+  slot categórico 1, documentado e testado contra daltonismo/contraste.
+- **Barras de ranking com uma cor só**: no dashboard Lovable usado como referência antes, cada
+  barra de "erros por setor/funcionário" tem uma cor diferente. Aqui todas ficam na mesma cor —
+  é uma única série (contagem por categoria), e a régua de dataviz trata "colorir cada barra de
+  uma métrica só, sem legenda" como anti-padrão (gasta o canal de identidade sem dizer o que cada
+  cor significa).
 
 ## Arquivos
 
