@@ -396,6 +396,76 @@ function dashRankingChart(container, key, items, opts) {
   );
 }
 
+// ---------- relatório em PDF (via impressão do navegador) ----------
+// Sem biblioteca externa (evita mais uma dependência de CDN): usa
+// window.print() com CSS @media print dedicado (esconde header/abas/
+// filtros/drawer, mostra só um cabeçalho com o filtro aplicado). Na tela
+// "Imprimir", a pessoa escolhe "Salvar como PDF" — gera um PDF de verdade,
+// com texto selecionável, não uma imagem. Se o tema atual for escuro, troca
+// pra claro antes (senão os gráficos saem com eixo/grade claros demais pra
+// enxergar num fundo branco de impressão) e volta pro tema original depois
+// que a caixa de diálogo de impressão fecha.
+function dashPrintReport(mesLabel, propLabel) {
+  const html = document.documentElement;
+  const originalTheme = html.getAttribute("data-theme") === "light" ? "light" : "dark";
+  const switchToLight = originalTheme !== "light";
+
+  const insertHeader = () => {
+    const header = document.createElement("div");
+    header.className = "dash-print-header";
+    header.id = "dashPrintHeader";
+    const h1 = document.createElement("h1");
+    h1.textContent = "Relatório de Indicadores — Sistema de Auditoria QAVI";
+    const pFiltro = document.createElement("p");
+    pFiltro.textContent = `Filtro aplicado: Mês — ${mesLabel} · Propriedade — ${propLabel}`;
+    const pData = document.createElement("p");
+    pData.textContent = `Gerado em ${new Date().toLocaleString("pt-BR")}`;
+    header.appendChild(h1);
+    header.appendChild(pFiltro);
+    header.appendChild(pData);
+    document.getElementById("dashBody").prepend(header);
+  };
+
+  let restored = false;
+  const restore = () => {
+    if (restored) return;
+    restored = true;
+    const existing = document.getElementById("dashPrintHeader");
+    if (existing) existing.remove();
+    if (switchToLight) {
+      html.setAttribute("data-theme", originalTheme);
+      applyThemeIcon(originalTheme);
+      renderDashboard();
+    }
+  };
+  window.addEventListener("afterprint", restore, { once: true });
+  try {
+    window.matchMedia("print").addEventListener(
+      "change",
+      (e) => { if (!e.matches) restore(); },
+      { once: true }
+    );
+  } catch (e) {
+    /* matchMedia sem addEventListener (navegador bem antigo) — afterprint já cobre */
+  }
+
+  const printNow = () => {
+    insertHeader();
+    window.print();
+  };
+
+  if (switchToLight) {
+    html.setAttribute("data-theme", "light");
+    applyThemeIcon("light");
+    renderDashboard();
+    // espera os canvases dos gráficos terminarem de redesenhar em cores
+    // claras antes de abrir a caixa de impressão.
+    requestAnimationFrame(() => requestAnimationFrame(printNow));
+  } else {
+    printNow();
+  }
+}
+
 // ---------- render principal ----------
 
 let dashFilterState = { mes: DASH_ALL, prop: DASH_ALL };
@@ -472,9 +542,20 @@ function renderDashboardFilters(dataset) {
     renderDashboard();
   });
 
+  const printBtn = document.createElement("button");
+  printBtn.type = "button";
+  printBtn.className = "btn btn-primary";
+  printBtn.textContent = "Gerar relatório PDF";
+  printBtn.addEventListener("click", () => {
+    // Lê o texto já selecionado nos <select> (não dashFilterState) pra
+    // pegar o rótulo legível ("Março de 2026"), não o value interno.
+    dashPrintReport(mesSelect.options[mesSelect.selectedIndex].text, propSelect.options[propSelect.selectedIndex].text);
+  });
+
   el.appendChild(mesField);
   el.appendChild(propField);
   el.appendChild(clearBtn);
+  el.appendChild(printBtn);
 }
 
 function renderDashboardBody(dataset) {

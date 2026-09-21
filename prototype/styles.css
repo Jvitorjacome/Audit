@@ -937,3 +937,37 @@ tr:hover > td .row-add, .row-add:focus-visible { opacity: 1; }
   .summary { gap: 14px; }
   .drawer { width: 100vw; }
 }
+
+/* ---------- Relatório PDF (Indicadores → "Gerar relatório PDF") ---------- */
+/* dashboard.js monta esse cabeçalho na hora de imprimir (título + filtro
+   aplicado + data/hora) — só aparece no papel, nunca na tela. */
+.dash-print-header { display: none; }
+
+@media print {
+  .theme-toggle, .page-header, .tab-bar, .dash-filters, .backdrop, .drawer, #tabAuditoria, .notice {
+    display: none !important;
+  }
+
+  .dash-print-header {
+    display: block;
+    margin-bottom: 20px;
+    padding-bottom: 14px;
+    border-bottom: 2px solid var(--border);
+  }
+  .dash-print-header h1 { font-size: 1.25rem; margin: 0 0 6px; }
+  .dash-print-header p { font-size: 0.82rem; margin: 2px 0; color: var(--text-muted); }
+
+  /* O zoom/esmaecimento de hover não faz sentido no papel (sem mouse) — e
+     sem isso o navegador não precisa decidir estado de :hover pra imprimir. */
+  .dash-block, .dash-block:hover { transform: none !important; box-shadow: none !important; }
+  #dashBody:hover .dash-block:not(:hover) { opacity: 1 !important; }
+
+  .dash-kpi, .dash-chart-card, .dash-month-card {
+    box-shadow: none !important;
+    border: 1px solid var(--border);
+    break-inside: avoid;
+  }
+  .dash-kpi-grid, .dash-chart-grid-2, .dash-month-grid, .dash-table tr {
+    break-inside: avoid;
+  }
+}

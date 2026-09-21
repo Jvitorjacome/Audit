@@ -294,6 +294,27 @@ com ocorrência "Descrição"/setor "Financeiro"/funcionário definido, aparece 
 KPIs, na lista de erros por propriedade e na tabela de tipos assim que se troca de aba — sem
 mexer no banco diretamente.
 
+Passar o mouse por cima de qualquer bloco (KPI, gráfico, mini-card de mês) dá um leve zoom nele e
+esmaece os outros, pra guiar o foco — sem transição/delay, a troca é instantânea.
+
+### Gerar relatório PDF
+
+Botão **"Gerar relatório PDF"** na barra de filtros gera um PDF com exatamente o que está
+filtrado na tela (mesmo filtro de mês/propriedade aplicado nos KPIs e gráficos). Não usa nenhuma
+biblioteca externa — é `window.print()` com CSS `@media print` dedicado: a caixa "Imprimir" do
+navegador abre e a pessoa escolhe "Salvar como PDF" (ou uma impressora de verdade, se quiser).
+Isso gera um PDF de verdade, com texto selecionável, não uma captura de tela.
+
+O que acontece por baixo:
+- Esconde cabeçalho, abas, filtros, drawer e o botão de tema — só o conteúdo dos Indicadores vai
+  pro papel.
+- Insere um cabeçalho só-de-impressão no topo: título, o filtro aplicado (mês e propriedade) por
+  extenso, e data/hora de geração.
+- Se o tema atual for escuro, troca pra claro antes de imprimir (senão os gráficos saem com
+  eixo/grade claros demais pra enxergar num fundo branco) e redesenha os gráficos nas cores
+  claras. Assim que a caixa de diálogo fecha (`afterprint`), volta pro tema original e redesenha
+  de novo — não mexe na preferência salva da pessoa.
+
 Uma diferença de propósito em relação ao original: lá, o gráfico de "Ocorrências por tipo" era
 um donut (pizza). Aqui virou barra — com até 16 tipos possíveis, uma pizza de tantas fatias fica
 difícil de ler; a régua de design usada (skill de dataviz) recomenda no máximo ~6 fatias para
