@@ -300,14 +300,17 @@ body {
   gap: 5px;
 }
 
-/* Ciano, não navy: o selo "Pendente" (status) já usa um azul-acinzentado
-   escuro — um chip de mês ativo na MESMA família de azul ficava parecido
-   demais com ele, dava pra confundir "isso é um status" com "isso é um
-   filtro ligado". Ciano é inconfundível com qualquer selo de status. */
+/* Preenchimento sólido de ciano (ou de navy) batia de frente com o verde/
+   vermelho dos selos Conforme/Não conforme logo acima — três cores fortes
+   competindo na mesma área. Filtro (mês ligado) não é status, então não
+   deveria brigar visualmente com selo de status: fica em ciano bem
+   diluído (tingido na superfície, não sólido) + borda, discreto o
+   suficiente pra não competir, mas ainda claramente "ligado". */
 .chip-active {
-  background: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface));
   border-color: var(--accent);
-  color: var(--navy);
+  color: var(--brand);
+  font-weight: 600;
 }
 
 .chip-badge {
