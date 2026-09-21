@@ -842,11 +842,13 @@ tr:hover > td .row-add, .row-add:focus-visible { opacity: 1; }
    resto do app) e desligado com prefers-reduced-motion. */
 .dash-block {
   position: relative;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, filter 0.2s ease;
+  /* transform/opacity são compositados direto pela GPU (não disparam
+     layout/paint), por isso ficam de fora do filter (que é caro e dava a
+     sensação de atraso no hover) — só isso já deixa a resposta instantânea. */
+  transition: transform 0.1s ease-out, box-shadow 0.1s ease-out, opacity 0.1s ease-out;
 }
 #dashBody:hover .dash-block:not(:hover) {
   opacity: 0.6;
-  filter: saturate(60%);
 }
 .dash-block:hover {
   transform: scale(1.04);
@@ -855,7 +857,7 @@ tr:hover > td .row-add, .row-add:focus-visible { opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
   .dash-block { transition: none; }
-  #dashBody:hover .dash-block:not(:hover) { opacity: 1; filter: none; }
+  #dashBody:hover .dash-block:not(:hover) { opacity: 1; }
   .dash-block:hover { transform: none; }
 }
 
