@@ -1,3 +1,44 @@
+// ---------- tema claro/escuro ----------
+// index.html já aplica o tema salvo (ou "dark", padrão) na tag <html> antes
+// do primeiro paint, direto num <script> inline — aqui só cuida do botão:
+// mostrar o ícone certo e trocar de tema ao clicar.
+
+function applyThemeIcon(theme) {
+  const sun = document.getElementById("themeIconSun");
+  const moon = document.getElementById("themeIconMoon");
+  if (!sun || !moon) return;
+  // .hidden (propriedade IDL) não reflete de forma confiável em elementos
+  // <svg> neste ambiente — mexe direto no atributo, que é o que o CSS
+  // ([hidden] { display: none !important; }) de fato lê.
+  const setHidden = (el, isHidden) => (isHidden ? el.setAttribute("hidden", "") : el.removeAttribute("hidden"));
+  setHidden(sun, theme !== "dark");
+  setHidden(moon, theme === "dark");
+}
+
+function setTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  try {
+    localStorage.setItem("dre-theme", theme);
+  } catch (e) {
+    /* private window / storage bloqueado — só não persiste entre sessões */
+  }
+  applyThemeIcon(theme);
+  // Os gráficos (Chart.js) são desenhados com cores fixas escolhidas na hora
+  // — trocar só a variável CSS não redesenha o que já está no canvas.
+  // Se a aba Indicadores estiver visível, renderiza de novo com as cores do
+  // novo tema (dashboard.js, carregado antes deste clique ser possível).
+  const indicadoresTab = document.getElementById("tabIndicadores");
+  if (indicadoresTab && !indicadoresTab.hidden && typeof renderDashboard === "function") {
+    renderDashboard();
+  }
+}
+
+applyThemeIcon(document.documentElement.getAttribute("data-theme") || "dark");
+document.getElementById("btnThemeToggle").addEventListener("click", () => {
+  const current = document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
+  setTheme(current === "dark" ? "light" : "dark");
+});
+
 // ---------- helpers ----------
 
 function groupBy(rows, key) {

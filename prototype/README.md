@@ -23,14 +23,21 @@ painel) para logar — peça ao administrador para te cadastrar (ver `db/README.
 
 ## Identidade visual
 
-Ultraminimalista, inspirado em Claude.ai/Stripe — fundo branco-sujo limpo (`--bg: #f9f9fb`),
-texto e estrutura em azul-marinho (`--navy: #0a192f`), e ciano elétrico (`--accent: #00e5ff`) só
-pra detalhe: trilho de 2px à esquerda da árvore, preenchimento das barras de progresso, sublinhado
-da aba ativa, anel de foco. Ciano nunca vira cor de texto corrido (ciano claro sobre fundo claro
-não tem contraste pra isso) — pra link/ícone/rótulo que precisa ser lido, usa `--brand: #00798f`,
-um passo mais escuro da mesma família. O cabeçalho é claro como o resto do app (não uma faixa
-navy cheia) — o navy aparece como detalhe no selo do ícone, não como um bloco grande de cor; é
-menos uma camada visual competindo por atenção, e o "ultraminimalista" pedido é sobretudo isso:
+Ultraminimalista, inspirado em Claude.ai/Stripe — dois temas, claro e escuro, com o mesmo botão
+☀️/🌙 fixo no canto superior direito (visível na tela de login e no app) pra trocar a qualquer
+momento; a escolha fica em `localStorage` e é reaplicada antes do primeiro paint da próxima visita
+(sem "piscar" o tema errado). **Escuro é o padrão** — o navy fosco (`--bg: #0a1526`,
+`--surface: #10233d`) que veio de uma rodada anterior do projeto era o preferido, então continua
+sendo o que abre por padrão pra quem ainda não trocou nesse navegador; claro (`--bg: #f9f9fb`,
+branco-sujo) fica disponível a um clique. Em ambos, texto e estrutura em azul-marinho
+(`--text`, ajustado por tema) e ciano elétrico (`--accent: #00e5ff`, **fixo — mesmo hex nos dois
+temas**) só pra detalhe: trilho de 2px à esquerda da árvore, preenchimento das barras de
+progresso, sublinhado da aba ativa, anel de foco. Ciano nunca vira cor de texto corrido (ciano
+claro sobre fundo claro, ou claro demais sobre fundo escuro, não tem contraste pra isso) — pra
+link/ícone/rótulo que precisa ser lido, usa `--brand`, um passo da mesma família calibrado por
+tema (mais escuro no claro, mais claro no escuro). O cabeçalho é claro/escuro como o resto do
+app (não uma faixa navy cheia fixa) — o navy vira só o selo do ícone; é menos uma camada visual
+competindo por atenção, e o "ultraminimalista" pedido é sobretudo isso:
 poucas cores, pouca sombra, pouca borda, bastante espaço em branco.
 
 **Declutter da árvore de Auditoria** (era a maior fonte de "poluição" visual): os botões de ação
@@ -57,7 +64,10 @@ do que ajudaria ali.
 - **Cor dos gráficos**: o ciano elétrico da marca não entra nas cores de dado do dashboard
   (Chart.js, em `dashboard.js`) — ele não é um hex validado pela régua de dataviz do projeto pra
   ser cor categórica de gráfico (só validado pra interface). Os gráficos continuam no azul do
-  slot categórico 1, documentado e testado contra daltonismo/contraste.
+  slot categórico 1, documentado e testado contra daltonismo/contraste — com um passo pra cada
+  tema (`DASH_COLOR_LIGHT`/`DASH_COLOR_DARK`), já que o Chart.js desenha com cor fixa e não lê
+  variável CSS; o dashboard redesenha os gráficos ao trocar de tema (ou de aba) pra pegar o passo
+  certo.
 - **Barras de ranking com uma cor só**: no dashboard Lovable usado como referência antes, cada
   barra de "erros por setor/funcionário" tem uma cor diferente. Aqui todas ficam na mesma cor —
   é uma única série (contagem por categoria), e a régua de dataviz trata "colorir cada barra de

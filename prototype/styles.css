@@ -1,10 +1,13 @@
-/* Ultraminimalista, inspirado em Claude.ai/Stripe: fundo branco-sujo limpo,
-   texto/estrutura em azul-marinho, ciano elétrico só pra detalhe (foco,
-   trilho, preenchimento de barra) — nunca como cor de texto corrida (ciano
-   claro sobre fundo claro não tem contraste pra isso). `--brand` é um passo
-   mais escuro da mesma família ciano, pensado pra texto/ícone/link legível;
-   `--accent` é o ciano puro do pedido, usado só em áreas pequenas/decorativas
-   (anel de foco, trilho de 2px, preenchimento de barra, sublinhado de aba). */
+/* Ultraminimalista, inspirado em Claude.ai/Stripe. `--accent` (ciano) e
+   `--navy` são fixos — os MESMOS hex nos dois temas — porque só entram em
+   pares de alto contraste (ciano de fundo + navy de texto, ex.: botão
+   primário, selo do ícone, aba/chip ativo), que funcionam igual em fundo
+   claro ou escuro. O resto (`--bg`/`--surface`/`--text`/`--brand`...) é
+   estrutural e troca por tema — ver `:root[data-theme="dark"]` abaixo.
+   `--brand` é um passo da família ciano calibrado pra texto/ícone/link
+   legível em CIMA da superfície do tema (mais escuro no claro, mais claro
+   no escuro) — `--accent` nunca vira cor de texto corrido, ciano claro sobre
+   fundo claro (ou escuro claro demais sobre escuro) não tem contraste. */
 :root {
   --bg: #f9f9fb;
   --surface: #ffffff;
@@ -28,6 +31,31 @@
   --shadow: 0 24px 48px rgba(10, 25, 47, 0.14);
   --shadow-card: 0 1px 2px rgba(10, 25, 47, 0.04);
   --shadow-card-hover: 0 6px 18px rgba(10, 25, 47, 0.08);
+}
+
+/* Navy fosco — ligado via botão claro/escuro no cabeçalho (app.js grava a
+   escolha em localStorage e aplica `data-theme` na tag <html> antes do
+   primeiro paint, pra não piscar o tema errado). */
+:root[data-theme="dark"] {
+  --bg: #0a1526;
+  --surface: #10233d;
+  --surface-2: #152943;
+  --border: rgba(255, 255, 255, 0.1);
+  --text: #eef3fa;
+  --text-muted: #9fb3cc;
+  --brand: #5fd3e8;
+  --brand-weak: #123244;
+  --ok-bg: #123322;
+  --ok-fg: #5fd88f;
+  --div-bg: #3a1518;
+  --div-fg: #f2867f;
+  --unv-bg: #182740;
+  --unv-fg: #9fb3cc;
+  --na-bg: #1e2740;
+  --na-fg: #9db0e8;
+  --shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 18px rgba(0, 0, 0, 0.35);
+  --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 * { box-sizing: border-box; }
@@ -136,6 +164,27 @@ body {
   color: var(--unv-fg);
 }
 .role-badge-admin { background: var(--brand-weak); color: var(--brand); }
+
+/* Botão claro/escuro — um só, fixo no canto, presente tanto na tela de
+   login quanto no app (por isso fica fora de #authScreen/#appScreen: os
+   dois têm `hidden` alternado, um elemento só evita duplicar id). */
+.theme-toggle {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.theme-toggle:hover { color: var(--brand); border-color: var(--brand); }
 
 /* ---------- tela de login ---------- */
 

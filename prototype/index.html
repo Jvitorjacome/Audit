@@ -6,8 +6,27 @@
 <title>Sistema de Auditoria - QAVI</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="styles.css">
+<script>
+  // Aplica o tema ANTES do primeiro paint, pra não piscar o tema errado por
+  // uma fração de segundo (o resto do app só carrega depois, via app.js).
+  // Padrão: escuro (preferência explícita do usuário) — só cai pra "light"
+  // se a pessoa já tiver trocado antes nesse navegador.
+  (function () {
+    try {
+      var saved = localStorage.getItem("dre-theme");
+      document.documentElement.setAttribute("data-theme", saved === "light" ? "light" : "dark");
+    } catch (e) {
+      document.documentElement.setAttribute("data-theme", "dark");
+    }
+  })();
+</script>
 </head>
 <body>
+
+<button class="theme-toggle" id="btnThemeToggle" type="button" aria-label="Alternar tema claro/escuro" title="Alternar tema claro/escuro">
+  <svg id="themeIconSun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" hidden><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+  <svg id="themeIconMoon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" hidden><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>
+</button>
 
 <div class="auth-screen" id="authScreen">
   <div class="auth-card">

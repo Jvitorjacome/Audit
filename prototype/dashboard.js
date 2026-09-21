@@ -10,14 +10,14 @@
 
 const DASH_ALL = "__all__";
 
-// Fundo claro (branco-sujo, ver styles.css) — cores do gráfico no passo
-// "light" da skill de dataviz (nunca escolhidas no olho): slot categórico 1
-// (azul) validado pra superfície clara. As cores de status (bom/aviso/
-// crítico) são fixas — os mesmos quatro hexs valem tanto pra superfície
-// clara quanto pra escura, documentado na própria skill. O ciano elétrico da
-// marca fica de fora daqui de propósito: não é um hex validado pra ser cor
-// categórica de gráfico, então mora só na interface (botões, trilho, foco).
-const DASH_COLOR = {
+// O app tem os dois temas agora (botão claro/escuro, ver app.js) — as cores
+// do gráfico (Chart.js desenha com valores fixos, não lê CSS) precisam do
+// passo certo da skill de dataviz pra cada superfície. Slot categórico 1
+// (azul) validado em cada modo; status (bom/aviso/crítico) é fixo — os
+// mesmos quatro hexs valem nas duas superfícies, documentado na própria
+// skill. O ciano elétrico da marca fica de fora de propósito: não é um hex
+// validado como cor categórica de gráfico, mora só na interface.
+const DASH_COLOR_LIGHT = {
   blue: "#2a78d6",
   good: "#0ca30c",
   warning: "#fab219",
@@ -28,6 +28,22 @@ const DASH_COLOR = {
   textSecondary: "#3d4f68",
   textMuted: "#64748b",
 };
+const DASH_COLOR_DARK = {
+  blue: "#3987e5",
+  good: "#0ca30c",
+  warning: "#fab219",
+  critical: "#d03b3b",
+  grid: "rgba(255, 255, 255, 0.08)",
+  axis: "rgba(255, 255, 255, 0.2)",
+  textPrimary: "#eef3fa",
+  textSecondary: "#c7d5e8",
+  textMuted: "#8ea3bf",
+};
+let DASH_COLOR = DASH_COLOR_LIGHT;
+function dashRefreshColors() {
+  const theme = document.documentElement.getAttribute("data-theme");
+  DASH_COLOR = theme === "dark" ? DASH_COLOR_DARK : DASH_COLOR_LIGHT;
+}
 
 // Ícones monoline simples (sem depender de CDN de ícones) — só pros KPIs do
 // topo do dashboard, pra reforçar o significado (bom/ruim/dinheiro) sem
@@ -360,6 +376,7 @@ function dashRankingChart(container, key, items, opts) {
 let dashFilterState = { mes: DASH_ALL, prop: DASH_ALL };
 
 function renderDashboard() {
+  dashRefreshColors();
   const dataset = collectDashboardRows();
   renderDashboardFilters(dataset);
   renderDashboardBody(dataset);
