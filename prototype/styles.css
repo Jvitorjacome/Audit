@@ -962,6 +962,14 @@ tr:hover > td .row-add, .row-add:focus-visible { opacity: 1; }
   .dash-block, .dash-block:hover { transform: none !important; box-shadow: none !important; }
   #dashBody:hover .dash-block:not(:hover) { opacity: 1 !important; }
 
+  /* .reveal só ganha .reveal-visible quando o card cruza a viewport durante
+     a rolagem (IntersectionObserver) — card que nunca foi rolado até a
+     tela fica com opacity:0 pra sempre. Impressão captura a página inteira
+     de uma vez, sem rolagem nenhuma, então sem isso o relatório saía com o
+     cabeçalho e o resto em branco. Força tudo visível, independente de já
+     ter sido "revelado" na tela ou não. */
+  .reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
+
   .dash-kpi, .dash-chart-card, .dash-month-card {
     box-shadow: none !important;
     border: 1px solid var(--border);
