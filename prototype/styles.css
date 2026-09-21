@@ -834,9 +834,30 @@ tr:hover > td .row-add, .row-add:focus-visible { opacity: 1; }
   border-radius: 14px;
   padding: 18px;
   box-shadow: var(--shadow-card);
-  transition: box-shadow 0.15s ease, transform 0.15s ease;
 }
-.dash-kpi:hover { box-shadow: var(--shadow-card-hover); transform: translateY(-1px); }
+
+/* Blocos do dashboard (KPI, gráfico, mini-card de mês): passar o mouse por
+   um dá zoom nele e esmaece os outros, pra guiar o foco — igual referência
+   de dashboard que o usuário pediu. Escopado a #dashBody (não vaza pro
+   resto do app) e desligado com prefers-reduced-motion. */
+.dash-block {
+  position: relative;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, filter 0.2s ease;
+}
+#dashBody:hover .dash-block:not(:hover) {
+  opacity: 0.6;
+  filter: saturate(60%);
+}
+.dash-block:hover {
+  transform: scale(1.04);
+  box-shadow: var(--shadow-card-hover);
+  z-index: 3;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dash-block { transition: none; }
+  #dashBody:hover .dash-block:not(:hover) { opacity: 1; filter: none; }
+  .dash-block:hover { transform: none; }
+}
 
 .dash-kpi-icon {
   display: inline-flex;

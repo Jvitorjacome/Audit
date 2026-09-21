@@ -265,7 +265,7 @@ function computeDashboardMetrics(dataset, mesFilter, propFilter) {
 
 function dashKpiCard(title, value, subtitle, variant, icon) {
   const card = document.createElement("div");
-  card.className = "dash-kpi reveal" + (variant ? ` dash-kpi-${variant}` : "");
+  card.className = "dash-kpi dash-block reveal" + (variant ? ` dash-kpi-${variant}` : "");
   if (icon) {
     const iconEl = document.createElement("span");
     iconEl.className = "dash-kpi-icon" + (variant ? ` dash-kpi-icon-${variant}` : "");
@@ -291,7 +291,7 @@ function dashKpiCard(title, value, subtitle, variant, icon) {
 
 function dashChartCard(title, subtitle) {
   const card = document.createElement("div");
-  card.className = "dash-chart-card reveal";
+  card.className = "dash-chart-card dash-block reveal";
   const head = document.createElement("div");
   head.className = "dash-chart-head";
   const titleEl = document.createElement("h3");
@@ -319,10 +319,35 @@ function dashDestroyCharts() {
   dashCharts = {};
 }
 
+// Estilo de barra "pill" com brilho colorido (pedido do usuário a partir de
+// uma referência visual) — cada barra fica arredondada nas duas pontas
+// (borderSkipped: false + raio alto) e ganha um halo suave na cor do
+// próprio dataset. Só o estilo visual muda; os dados/legendas continuam os
+// mesmos daqui do dashboard. shadowColor/shadowBlur são propriedades nativas
+// do canvas 2D, então isso funciona em qualquer navegador sem plugin externo.
+const dashBarGlowPlugin = {
+  id: "dashBarGlow",
+  beforeDatasetDraw(chart, args) {
+    const ds = chart.data.datasets[args.index];
+    const color = Array.isArray(ds.backgroundColor) ? ds.backgroundColor[0] : ds.backgroundColor;
+    chart.ctx.save();
+    chart.ctx.shadowColor = color;
+    chart.ctx.shadowBlur = 10;
+    chart.ctx.shadowOffsetY = 2;
+  },
+  afterDatasetDraw(chart) {
+    chart.ctx.restore();
+  },
+};
+
 function dashBarChart(canvas, key, labels, datasets, opts) {
+  const pillDatasets = datasets.map((ds) =>
+    Object.assign({ borderSkipped: false, barPercentage: 0.55, categoryPercentage: 0.7 }, ds)
+  );
   dashCharts[key] = new Chart(canvas.getContext("2d"), {
     type: "bar",
-    data: { labels, datasets },
+    data: { labels, datasets: pillDatasets },
+    plugins: [dashBarGlowPlugin],
     options: Object.assign(
       {
         indexAxis: opts && opts.horizontal ? "y" : "x",
@@ -366,7 +391,7 @@ function dashRankingChart(container, key, items, opts) {
     canvas,
     key,
     items.map((i) => i.name),
-    [{ label: (opts && opts.seriesLabel) || "Total", data: items.map((i) => i.value), backgroundColor: DASH_COLOR.blue, maxBarThickness: 22, borderRadius: 4 }],
+    [{ label: (opts && opts.seriesLabel) || "Total", data: items.map((i) => i.value), backgroundColor: DASH_COLOR.blue, maxBarThickness: 20, borderRadius: 10 }],
     { horizontal: true }
   );
 }
@@ -495,7 +520,7 @@ function renderDashboardBody(dataset) {
     monthGrid.className = "dash-month-grid";
     for (const item of m.conformidadePorMes) {
       const card = document.createElement("div");
-      card.className = "dash-month-card reveal";
+      card.className = "dash-month-card dash-block reveal";
       const label = document.createElement("p");
       label.className = "dash-month-label";
       label.textContent = item.mesLabel;
@@ -536,8 +561,8 @@ function renderDashboardBody(dataset) {
       "conf",
       m.conformidadePorMes.map((i) => i.mesLabel),
       [
-        { label: "Conformes", data: m.conformidadePorMes.map((i) => i.conformes), backgroundColor: DASH_COLOR.good, maxBarThickness: 24, borderRadius: 4 },
-        { label: "Erros", data: m.conformidadePorMes.map((i) => i.erros), backgroundColor: DASH_COLOR.critical, maxBarThickness: 24, borderRadius: 4 },
+        { label: "Conformes", data: m.conformidadePorMes.map((i) => i.conformes), backgroundColor: DASH_COLOR.good, maxBarThickness: 22, borderRadius: 11 },
+        { label: "Erros", data: m.conformidadePorMes.map((i) => i.erros), backgroundColor: DASH_COLOR.critical, maxBarThickness: 22, borderRadius: 11 },
       ]
     );
   } else {
