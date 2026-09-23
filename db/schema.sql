@@ -193,6 +193,7 @@ create table audit_status (
   coerencia_patrimonial audit_status_value not null default 'nao_verificado',
 
   valor_base_target text, -- mantido como texto: a planilha original mistura número e texto livre aqui
+  valor_pago text, -- quanto foi de fato pago (o target acima é só a base de comparação) — indicadores somam este, não o target
   observacoes text,
 
   -- Rastreio de ocorrência (colunas E-H da aba "Observações" da planilha
@@ -238,6 +239,7 @@ create table variable_entries (
   coerencia_patrimonial audit_status_value not null default 'nao_verificado',
 
   valor_base_target text,
+  valor_pago text,
   observacoes text,
 
   ocorrencia_tipo text,
@@ -342,7 +344,7 @@ select
   ast.year, ast.month,
   ast.valores_banco, ast.coerencia_numerica, ast.coerencia_contabil,
   ast.composicao_debito, ast.coerencia_patrimonial,
-  ast.valor_base_target, ast.observacoes,
+  ast.valor_base_target, ast.valor_pago, ast.observacoes,
   ast.ocorrencia_tipo, ast.corrigido, ast.setor_responsavel, ast.funcionario_responsavel,
   (
     (ast.valores_banco = 'nao_conforme') or

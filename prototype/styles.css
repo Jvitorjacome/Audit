@@ -730,6 +730,11 @@ tr:hover > td .row-add, .row-add:focus-visible { opacity: 1; }
 .field-row { display: flex; gap: 6px; align-items: center; }
 .field-row .select { flex: 1; min-width: 0; }
 
+/* Valor base/target + Valor pago lado a lado no painel — quebra pra baixo
+   sozinho se o painel ficar estreito demais (mobile). */
+.field-pair { display: flex; gap: 12px; flex-wrap: wrap; }
+.field-pair .field { flex: 1; min-width: 130px; }
+
 .field-clear {
   flex-shrink: 0;
   border: 1px solid var(--border);

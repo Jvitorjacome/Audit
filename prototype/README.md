@@ -268,7 +268,7 @@ pra desfazer.
 Além dos **campos de auditoria** fixos (esperados em todo mês), agora dá pra auditar **contas
 variáveis** — despesas que só aparecem de vez em quando (reembolso, compra pontual, etc.) — do
 mesmo jeito: os mesmos 5 indicadores, o mesmo rastreio de ocorrência (tipo, setor responsável,
-funcionário responsável, corrigido), valor base/target e observações.
+funcionário responsável, corrigido), valor base/target, valor pago e observações.
 
 A diferença é que uma conta variável **já nasce presa a um mês específico** — ela não é um item
 permanente da árvore com uma célula em cada mês como o campo fixo; é um lançamento avulso daquele
@@ -308,15 +308,20 @@ inteiro. Conta campos fixos e contas variáveis juntos. Mostra:
   (não conta célula tocada só por causa de valor/observações/ocorrência, nem mês oculto — ver
   "Ações por mês" acima), com **% de erro** em cima desse total.
 - **Não conformidades** e **taxa de conformidade**.
-- **Impacto financeiro (não corrigido)** — soma do valor dos campos não conformes com
-  "Corrigido = Não".
-- **Valores corrigidos** — soma do valor dos campos não conformes com "Corrigido = Sim". (A
+- **Impacto financeiro (não corrigido)** — soma do **valor pago** dos campos não conformes com
+  "Corrigido = Não" (não o valor base/target — ver abaixo).
+- **Valores corrigidos** — soma do **valor pago** dos campos não conformes com "Corrigido = Sim". (A
   separação QAVI vs proprietário desses dois totais — que existia no Lovable original — fica
   pra uma próxima rodada, a pedido; o código já calcula essa classificação internamente, só não
   está exposta na tela ainda.)
 - Erros por setor responsável, por funcionário responsável e por propriedade.
 - Conformidade por mês (cards + gráfico).
 - Ocorrências por tipo, com quantidade e valor total (tabela + gráfico).
+
+O painel de cada campo (e de cada conta variável) tem dois campos de valor lado a lado:
+**Valor base/target** (a referência/base de comparação, ex.: quanto deveria ter sido cobrado) e
+**Valor pago** (quanto de fato saiu/entrou). Os indicadores somam sempre o **valor pago** — o
+target é só contexto pro auditor, não entra em nenhuma soma da aba Indicadores.
 
 **É em tempo real** no sentido que importa: os gráficos leem direto de `state.tree`/`state.cells`
 (os mesmos dados já carregados pela aba Auditoria), então qualquer edição feita no painel lateral

@@ -195,6 +195,7 @@ async function persistCellField(auditFieldId, monthKey, uiFieldKey, uiValue) {
   if (statusField) payload[statusField.column] = STATUS_LABEL_TO_DB[uiValue];
   else if (ocorrenciaField) payload[ocorrenciaField.column] = uiValue || null;
   else if (uiFieldKey === "valorBaseTarget") payload.valor_base_target = uiValue;
+  else if (uiFieldKey === "valorPago") payload.valor_pago = uiValue;
   else if (uiFieldKey === "observacoes") payload.observacoes = uiValue;
 
   const { error } = await sb.from("audit_status").upsert(payload, { onConflict: "audit_field_id,year,month" });
@@ -210,12 +211,13 @@ async function clearCell(auditFieldId, monthKey) {
   for (const f of STATUS_FIELDS) payload[f.column] = "nao_verificado";
   for (const f of OCORRENCIA_FIELDS) payload[f.column] = null;
   payload.valor_base_target = null;
+  payload.valor_pago = null;
   payload.observacoes = null;
 
   const { error } = await sb.from("audit_status").upsert(payload, { onConflict: "audit_field_id,year,month" });
   if (error) throw error;
 
-  const cell = { valorBaseTarget: "", observacoes: "", isHidden: getCell(auditFieldId, monthKey).isHidden || false };
+  const cell = { valorBaseTarget: "", valorPago: "", observacoes: "", isHidden: getCell(auditFieldId, monthKey).isHidden || false };
   for (const f of STATUS_FIELDS) cell[f.key] = "Não verificado";
   for (const f of OCORRENCIA_FIELDS) cell[f.key] = "";
   state.cells[cellKey(auditFieldId, monthKey)] = cell;
@@ -276,6 +278,7 @@ async function persistVariableField(id, uiFieldKey, uiValue) {
   if (statusField) payload[statusField.column] = STATUS_LABEL_TO_DB[uiValue];
   else if (ocorrenciaField) payload[ocorrenciaField.column] = uiValue || null;
   else if (uiFieldKey === "valorBaseTarget") payload.valor_base_target = uiValue;
+  else if (uiFieldKey === "valorPago") payload.valor_pago = uiValue;
   else if (uiFieldKey === "observacoes") payload.observacoes = uiValue;
 
   const { error } = await sb.from("variable_entries").update(payload).eq("id", id);
@@ -289,6 +292,7 @@ async function clearVariableEntry(id) {
   for (const f of STATUS_FIELDS) payload[f.column] = "nao_verificado";
   for (const f of OCORRENCIA_FIELDS) payload[f.column] = null;
   payload.valor_base_target = null;
+  payload.valor_pago = null;
   payload.observacoes = null;
 
   const { error } = await sb.from("variable_entries").update(payload).eq("id", id);
@@ -411,7 +415,10 @@ function buildTree(sections, states, properties, costCenters, auditFields, showH
 // contas variáveis, que não passam por buildCells (não têm cellKey — já
 // chegam como uma linha só, sem mês variável).
 function rowToCell(row) {
-  const cell = { valorBaseTarget: row.valor_base_target || "", observacoes: row.observacoes || "", isHidden: !!row.is_hidden };
+  const cell = {
+    valorBaseTarget: row.valor_base_target || "", valorPago: row.valor_pago || "",
+    observacoes: row.observacoes || "", isHidden: !!row.is_hidden,
+  };
   for (const f of STATUS_FIELDS) cell[f.key] = STATUS_DB_TO_LABEL[row[f.column]] || "Não verificado";
   for (const f of OCORRENCIA_FIELDS) cell[f.key] = row[f.column] || "";
   return cell;
@@ -1305,6 +1312,7 @@ function makeTextPersister(uiFieldKey) {
   }, 600);
 }
 const persistValor = makeTextPersister("valorBaseTarget");
+const persistValorPago = makeTextPersister("valorPago");
 const persistObs = makeTextPersister("observacoes");
 
 // Abre o painel lateral pra um campo auditado (fixo), num mês específico —
@@ -1595,6 +1603,11 @@ function renderDrawerBody(ctx) {
   valorInput.value = cell.valorBaseTarget || "";
   valorInput.disabled = !canEdit;
   valorInput.oninput = () => persistValor(valorInput.value);
+
+  const valorPagoInput = document.getElementById("drawerValorPago");
+  valorPagoInput.value = cell.valorPago || "";
+  valorPagoInput.disabled = !canEdit;
+  valorPagoInput.oninput = () => persistValorPago(valorPagoInput.value);
 
   const obsInput = document.getElementById("drawerObservacoes");
   obsInput.value = cell.observacoes || "";

@@ -151,7 +151,9 @@ function collectDashboardRows() {
     if (!hasNaoConforme) return;
     rows.push({
       propriedade, mes: monthKey,
-      valor: dashParseValor(cell.valorBaseTarget),
+      // Indicadores somam o valor PAGO (o que de fato saiu/entrou), não o
+      // target (que é só a base de comparação) — pedido explícito do usuário.
+      valor: dashParseValor(cell.valorPago),
       ocorrenciaTipo: cell.ocorrenciaTipo || "",
       corrigido: cell.corrigido || "",
       setor: cell.setorResponsavel || "",

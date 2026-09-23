@@ -19,6 +19,16 @@ projeto Supabase de produção da QAVI** ("Auditoria - Qavi", projeto
   contém o resultado de todas elas — só use a pasta `migrations/` se estiver
   aplicando em um projeto que já rodava uma versão anterior do schema.
 
+### `migrations/011_valor_pago.sql`
+
+Já aplicada. Nova coluna `valor_pago` em `audit_status` e `variable_entries`, ao lado de
+`valor_base_target` (mesmo padrão: texto livre). `valor_base_target` é a referência/base de
+comparação; `valor_pago` é quanto foi de fato pago. A aba Indicadores passou a somar
+`valor_pago` em vez de `valor_base_target` nos KPIs de impacto financeiro — pedido explícito do
+usuário, pra não misturar "quanto deveria ser" com "quanto realmente foi". `v_audit_overview`
+também foi recriada (drop + create, porque `create or replace view` não permite inserir coluna
+no meio da lista) já incluindo `valor_pago`.
+
 ### `migrations/010_retire_audit_fields.sql`
 
 Já aplicada. Estende "retirado a partir de um mês" (mesma ideia de `retired_year`/
