@@ -192,14 +192,19 @@ Os dois usam o mesmo botão **"Mostrar campos ocultos"** da barra de ferramentas
 de novo (tanto o ocultado manualmente quanto o retirado que já devia ter sumido pelo filtro de
 mês atual) — nenhum dado é perdido em nenhum dos dois casos, só a visibilidade muda.
 
-## Renomear campos (admin)
+## Renomear e reordenar campos (admin)
 
 Além de ocultar/retirar (seção acima, agora comum aos 4 níveis), cada **campo auditado** tem
-um botão extra (visível só pra `admin`):
+dois recursos extras (visíveis só pra `admin`):
 
 - **✎ (renomear)** — pede o novo nome e atualiza na hora. Útil quando o nome real do item mudou.
   Isso é uma propriedade do campo em si, então vale pra todos os meses (não faz sentido um campo
   ter nomes diferentes mês a mês).
+- **⠿ (arrastar pra reordenar)** — um "handle" discreto (só some da opacidade baixa ao passar o
+  mouse na linha) no começo do nome do campo. Arraste um campo pra cima ou pra baixo de outro
+  **dentro do mesmo centro de custo** pra reordenar — útil pra agrupar itens parecidos (ex.:
+  juntar todos os salários, que às vezes ficam espalhados pela ordem em que foram cadastrados).
+  Salva a nova ordem (`sort_order`) na hora; não move um campo pra outro centro de custo.
 
 Campos ocultos ou retirados ficam de fora por padrão. O botão **"Mostrar itens ocultos/
 retirados"** na barra de ferramentas (só pra admin) revela todos de novo, esmaecidos e

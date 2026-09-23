@@ -596,6 +596,25 @@ tr:hover > td .row-toggle-active,
 }
 .toggle-spacer { display: inline-block; width: 18px; }
 
+/* Arrastar pra reordenar campos (só admin) — discreto até passar o mouse na
+   linha, mesmo padrão dos outros ícones de ação da árvore. */
+.row-drag-handle {
+  display: inline-block;
+  width: 16px;
+  cursor: grab;
+  color: var(--text-muted);
+  opacity: 0.3;
+  font-size: 0.85rem;
+  vertical-align: middle;
+  transition: opacity 0.12s ease;
+}
+tr:hover > td .row-drag-handle { opacity: 1; }
+.row-drag-handle:active { cursor: grabbing; }
+
+/* Indica em qual linha o campo arrastado vai pousar (acima/abaixo dela). */
+.drag-over-top { box-shadow: inset 0 2px 0 0 var(--accent); }
+.drag-over-bottom { box-shadow: inset 0 -2px 0 0 var(--accent); }
+
 .node-count { color: var(--text-muted); font-size: 0.78rem; font-weight: 400; font-variant-numeric: tabular-nums; }
 .node-name { vertical-align: middle; }
 

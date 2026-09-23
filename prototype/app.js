@@ -140,6 +140,11 @@ let isAdmin = false;
 // nem mostrar os controles de edição pra quem não pode usá-los.
 let canEdit = false;
 
+// Reordenar campos por arrastar (só admin, só dentro do mesmo centro de
+// custo — ver attachCampoDragHandlers). Guarda o campo/lista de irmãos que
+// começou a ser arrastado, pra saber contra quem comparar no dragover/drop.
+let dragCampo = null;
+
 // ---------- cells (status mensal, agora vindos do Supabase) ----------
 
 function cellKey(id, monthKey) {
@@ -511,6 +516,53 @@ async function setCampoActive(id, isActive) {
   if (error) throw error;
 }
 
+// Grava a ordem de novo (sort_order = índice na lista) pra todos os campos
+// de um centro de custo — chamado depois de um arrastar-e-soltar. Regrava
+// todo mundo, não só quem mudou de posição: mais simples e robusto do que
+// calcular exatamente quais linhas o reorder afetou.
+async function reorderCampos(campos) {
+  const results = await Promise.all(
+    campos.map((c, i) => sb.from("audit_fields").update({ sort_order: i }).eq("id", c.id))
+  );
+  const failed = results.find((r) => r.error);
+  if (failed) throw failed.error;
+}
+
+// Arrastar-e-soltar pra reordenar campos dentro do MESMO centro de custo
+// (não move entre centros — dragCampo.parentArray precisa ser exatamente o
+// mesmo array de irmãos da linha em que soltou). API nativa de drag do
+// navegador, sem biblioteca nenhuma.
+function attachCampoDragHandlers(tr, node, parentArray) {
+  tr.addEventListener("dragover", (e) => {
+    if (!dragCampo || dragCampo.parentArray !== parentArray || dragCampo.node === node) return;
+    e.preventDefault();
+    const before = e.clientY - tr.getBoundingClientRect().top < tr.getBoundingClientRect().height / 2;
+    tr.classList.toggle("drag-over-top", before);
+    tr.classList.toggle("drag-over-bottom", !before);
+  });
+  tr.addEventListener("dragleave", () => {
+    tr.classList.remove("drag-over-top", "drag-over-bottom");
+  });
+  tr.addEventListener("drop", async (e) => {
+    e.preventDefault();
+    tr.classList.remove("drag-over-top", "drag-over-bottom");
+    if (!dragCampo || dragCampo.parentArray !== parentArray || dragCampo.node === node) return;
+    const before = e.clientY - tr.getBoundingClientRect().top < tr.getBoundingClientRect().height / 2;
+    const fromIdx = parentArray.indexOf(dragCampo.node);
+    if (fromIdx < 0) return;
+    const [moved] = parentArray.splice(fromIdx, 1);
+    let toIdx = parentArray.indexOf(node) + (before ? 0 : 1);
+    parentArray.splice(toIdx, 0, moved);
+    dragCampo = null;
+    renderTreeTable();
+    try {
+      await reorderCampos(parentArray);
+    } catch (err) {
+      alert("Não foi possível salvar a nova ordem: " + describeError(err, "structure"));
+    }
+  });
+}
+
 // Ocultar/mostrar Estado, Propriedade ou Centro de custo (reversível, sem
 // relação com mês) — mesma ideia de setCampoActive, generalizada pros 3
 // níveis de estrutura que agora também têm is_active (migração 009).
@@ -772,6 +824,32 @@ function renderTreeTable() {
     const tdName = document.createElement("td");
     tdName.className = "col-account";
     tdName.style.paddingLeft = `${10 + depth * 20}px`;
+
+    if (kind === "campo" && isAdmin && parentArray) {
+      // Só admin arrasta, e só entre campos do mesmo centro de custo — o
+      // "handle" é um alvo pequeno de propósito, pra não disparar drag sem
+      // querer ao clicar no resto da linha (que abre o painel do campo).
+      const dragHandle = document.createElement("span");
+      dragHandle.className = "row-drag-handle";
+      dragHandle.title = "Arrastar pra reordenar";
+      dragHandle.textContent = "⠿";
+      dragHandle.draggable = true;
+      dragHandle.addEventListener("click", (e) => e.stopPropagation());
+      dragHandle.addEventListener("dragstart", (e) => {
+        e.stopPropagation();
+        dragCampo = { node, parentArray };
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", node.id); // Firefox exige setData pra permitir o drag
+      });
+      dragHandle.addEventListener("dragend", () => {
+        dragCampo = null;
+        document
+          .querySelectorAll(".drag-over-top, .drag-over-bottom")
+          .forEach((el) => el.classList.remove("drag-over-top", "drag-over-bottom"));
+      });
+      tdName.appendChild(dragHandle);
+      attachCampoDragHandlers(tr, node, parentArray);
+    }
 
     if (hasKids) {
       const toggle = document.createElement("button");
