@@ -827,7 +827,7 @@ function renderTreeTable() {
     const tr = document.createElement("tr");
     tr.className =
       `row-tree row-depth-${Math.min(depth, 5)} row-kind-${kind}` +
-      (node.isActive === false || node.retiredMonth != null ? " row-inactive" : "");
+      (node.isActive === false || (state.showHidden && node.retiredMonth != null) ? " row-inactive" : "");
     const tdName = document.createElement("td");
     tdName.className = "col-account";
     tdName.style.paddingLeft = `${10 + depth * 20}px`;
@@ -896,7 +896,7 @@ function renderTreeTable() {
       hiddenBadge.textContent = " (oculto)";
       tdName.appendChild(hiddenBadge);
     }
-    if (node.retiredMonth != null) {
+    if (state.showHidden && node.retiredMonth != null) {
       const retiredBadge = document.createElement("span");
       retiredBadge.className = "node-count";
       const monthLabel = (MONTH_BY_NUMBER[node.retiredMonth] || {}).label || node.retiredMonth;

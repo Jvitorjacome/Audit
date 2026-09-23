@@ -178,8 +178,11 @@ Centro de custo e Campo auditado) têm dois recursos independentes (mesmos botõ
   - **O histórico e os indicadores nunca somem** — nada é apagado no banco, e a aba
     Indicadores nunca filtra por isso, então tudo que já foi auditado antes da retirada
     continua contando nos KPIs e gráficos pra sempre.
-  - A linha ganha o selo **"(retirado a partir de mês/ano)"** e fica esmaecida, pra deixar
-    claro que ela vai sumir mais pra frente.
+  - Enquanto **"Mostrar itens ocultos/retirados" estiver desligado**, a linha aparece normal
+    (sem selo, sem esmaecer) nos meses anteriores à retirada — só some quando o filtro de mês
+    já é todo posterior ao corte. Ligando **"Mostrar itens ocultos/retirados"**, ela ganha o
+    selo **"(retirado a partir de mês/ano)"** e fica esmaecida, pra deixar claro que ela vai
+    sumir mais pra frente.
   - O botão vira **↺ (reativar)** enquanto o item estiver retirado — clicar desfaz a
     retirada (remove a data) e ele volta a aparecer normalmente em qualquer mês.
 - **🗕/🗗 (ocultar/mostrar)** — igual ao que o campo já tinha: some da árvore
@@ -206,10 +209,11 @@ dois recursos extras (visíveis só pra `admin`):
   juntar todos os salários, que às vezes ficam espalhados pela ordem em que foram cadastrados).
   Salva a nova ordem (`sort_order`) na hora; não move um campo pra outro centro de custo.
 
-Campos ocultos ou retirados ficam de fora por padrão. O botão **"Mostrar itens ocultos/
-retirados"** na barra de ferramentas (só pra admin) revela todos de novo, esmaecidos e
-marcados com "(oculto)" ou "(retirado a partir de mês/ano)", pra você conseguir achar e
-reativar algum se precisar.
+Campos ocultos ficam de fora por padrão, e campos retirados somem assim que o filtro de mês
+só mostra meses depois da retirada. O botão **"Mostrar itens ocultos/retirados"** na barra de
+ferramentas (só pra admin) revela todos de novo (inclusive os ainda visíveis por causa de um
+mês anterior no filtro), esmaecidos e marcados com "(oculto)" ou "(retirado a partir de
+mês/ano)", pra você conseguir achar e reativar algum se precisar.
 
 ## Ações por mês: apagar, editar e ocultar valem só pro mês, não pro campo inteiro
 
