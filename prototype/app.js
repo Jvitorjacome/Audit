@@ -172,7 +172,10 @@ function cellAggregateToneFromCell(cell) {
     if (v === "Não Conforme") naoConforme++;
     else if (v === "Não verificado") naoVerificado++;
   }
-  if (naoConforme > 0) return { tone: "div", label: "Não conforme" };
+  // "Não conforme" some quando marcam "Corrigido? = Sim" no painel — o selo
+  // continua igual (não esconde que houve um erro), só ganha um ✓ discreto
+  // do lado pra diferenciar "ainda pendente de correção" de "já corrigido".
+  if (naoConforme > 0) return { tone: "div", label: "Não conforme", corrected: cell.corrigido === "Sim" };
   if (naoVerificado > 0) return { tone: "unv", label: "Pendente" };
   return { tone: "ok", label: "Conforme" };
 }
@@ -185,6 +188,15 @@ function cellAggregateTone(id, monthKey) {
 }
 function cellDetailTitle(id, monthKey) {
   return cellDetailTitleFromCell(getCell(id, monthKey));
+}
+// Marca "✓ corrigido" que acompanha o selo "Não conforme" quando o campo
+// "Corrigido?" do painel está em "Sim" — ver cellAggregateToneFromCell.
+function buildCorrectedMark() {
+  const mark = document.createElement("span");
+  mark.className = "status-corrected-mark";
+  mark.textContent = "✓ Corrigido";
+  mark.title = "Ainda não conforme, mas já marcado como corrigido";
+  return mark;
 }
 
 async function persistCellField(auditFieldId, monthKey, uiFieldKey, uiValue) {
@@ -725,7 +737,7 @@ function monthCellsFragment(node, months) {
   for (const m of months) {
     const td = document.createElement("td");
     td.className = "cell-month";
-    const { tone, label } = cellAggregateTone(node.id, m.key);
+    const { tone, label, corrected } = cellAggregateTone(node.id, m.key);
 
     const inner = document.createElement("span");
     inner.className = "cell-month-inner";
@@ -733,6 +745,7 @@ function monthCellsFragment(node, months) {
     badge.className = `status-badge status-badge-${tone}`;
     badge.textContent = label;
     inner.appendChild(badge);
+    if (corrected) inner.appendChild(buildCorrectedMark());
 
     if (canEdit) {
       // Apagar é sempre uma ação de UM mês só: cada célula tem seu próprio
@@ -1224,13 +1237,14 @@ function renderTreeTable() {
       }
       td.className = "cell-month";
       const cell = rowToCell(entry);
-      const { tone, label } = cellAggregateToneFromCell(cell);
+      const { tone, label, corrected } = cellAggregateToneFromCell(cell);
       const inner = document.createElement("span");
       inner.className = "cell-month-inner";
       const badge = document.createElement("span");
       badge.className = `status-badge status-badge-${tone}`;
       badge.textContent = label;
       inner.appendChild(badge);
+      if (corrected) inner.appendChild(buildCorrectedMark());
       td.appendChild(inner);
       td.title = cellDetailTitleFromCell(cell);
       if (tone === "div") td.classList.add("cell-tone-div");
@@ -1581,6 +1595,8 @@ function renderDrawerBody(ctx) {
           await drawerCtx.persistField(f.key, newValue.trim());
           setSaving("saved");
           ctx.onReopen();
+          renderTreeTable();
+          renderSummary();
         } catch (err) {
           setSaving("error");
           alert("Não foi possível adicionar a opção: " + describeError(err, "structure"));
@@ -1593,6 +1609,12 @@ function renderDrawerBody(ctx) {
         await drawerCtx.persistField(f.key, select.value);
         setSaving("saved");
         ctx.onReopen();
+        // "Corrigido?" muda o selo da árvore (✓ Corrigido ao lado de "Não
+        // conforme", ver cellAggregateToneFromCell) — os outros campos de
+        // ocorrência não afetam o selo, mas redesenhar sempre é barato e
+        // evita esse tipo de gap ficar escondido de novo no futuro.
+        renderTreeTable();
+        renderSummary();
       } catch (err) {
         setSaving("error");
         alert("Não foi possível salvar: " + describeError(err));

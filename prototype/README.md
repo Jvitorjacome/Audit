@@ -246,7 +246,11 @@ espelhando as colunas E-H da aba "Observações" da planilha "Setor Auditoria":
    target, etc.).
 2. **Setor responsável** — Compras, Financeiro, Host, RH...
 3. **Funcionário responsável** — quem é o responsável.
-4. **Corrigido?** — Sim/Não (sempre por último, e sempre só essas duas opções).
+4. **Corrigido?** — Sim/Não (sempre por último, e sempre só essas duas opções). Marcar "Sim" num
+   mês não conforme faz o selo `Não conforme` da árvore ganhar um **"✓ Corrigido"** discreto do
+   lado (só texto, sem virar um segundo selo) — o selo continua vermelho, porque a não
+   conformidade aconteceu, só que agora dá pra ver de longe que já foi resolvida, sem precisar
+   abrir o painel de cada célula pra saber se ainda está pendente.
 
 Pra não poluir o painel à toa, eles aparecem **em cascata**: só depois de marcar o tipo de
 ocorrência é que "Setor responsável" aparece, e assim por diante. Se nenhuma ocorrência houver

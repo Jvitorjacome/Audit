@@ -470,7 +470,17 @@ thead .col-account { background: var(--surface-2); z-index: 2; }
 .status-badge-unv { background: var(--unv-bg); color: var(--unv-fg); }
 .status-badge-hidden { background: transparent; border: 1px dashed var(--border); color: var(--text-muted); font-style: italic; }
 
-.cell-month-inner { display: inline-flex; align-items: center; gap: 4px; }
+/* "✓ Corrigido" ao lado do selo "Não conforme": só texto, sem fundo/borda
+   próprios, pra não virar um segundo selo competindo com o principal —
+   avisa que já foi corrigido sem esconder que houve uma não conformidade. */
+.status-corrected-mark {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--ok-fg);
+  white-space: nowrap;
+}
+
+.cell-month-inner { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; row-gap: 2px; }
 /* × de apagar/ações de linha: quase invisíveis até passar o mouse (ou focar
    via teclado) — é a maior fonte de poluição visual da árvore, um ícone
    sempre aceso do lado de cada selo, em cada linha. Fica em opacidade baixa
