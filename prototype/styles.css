@@ -522,7 +522,20 @@ thead .col-account { background: var(--surface-2); z-index: 2; }
 }
 .auditbar-alert { color: var(--div-fg); font-weight: 600; }
 
-.col-actions { width: 100px; text-align: right; white-space: nowrap; }
+/* Fixa à direita (mesmo padrão de .col-account fixada à esquerda) — sem
+   isso, linhas com mais de 2 ícones de ação (ex.: Campo, que agora tem
+   ✎/🗕/× = 3) ficavam mais largas que a área visível e o botão de retirar
+   só aparecia rolando a tabela pro lado, o que ninguém percebia. */
+.col-actions {
+  width: 100px;
+  text-align: right;
+  white-space: nowrap;
+  position: sticky;
+  right: 0;
+  background: var(--surface);
+  z-index: 1;
+}
+thead .col-actions { background: var(--surface-2); z-index: 2; }
 
 .row-delete,
 .row-rename,
