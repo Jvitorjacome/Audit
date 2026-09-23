@@ -110,6 +110,8 @@ create table audit_fields (
   sort_order int not null default 0,
   source_row int,
   is_active boolean not null default true, -- oculta o campo sem apagar o histórico de status
+  retired_year int,
+  retired_month int check (retired_month between 1 and 12), -- "retirado a partir de" (ex.: funcionário que saiu) — ver states/properties/cost_centers
   created_at timestamptz not null default now(),
   created_by uuid references profiles(id)
 );

@@ -87,7 +87,7 @@ function makeNode(kind, name, id, row = null) {
   if (kind === "channel") return { ...base, properties: [] };
   if (kind === "property") return { ...base, centros: [] };
   if (kind === "centro") return { ...base, campos: [] };
-  return { id, name, row, isActive: true }; // campo: leaf, sem retirada
+  return { id, name, row, isActive: true, retiredYear: null, retiredMonth: null }; // campo: leaf
 }
 
 function walkTree(nodes, kind, visit) {
@@ -356,6 +356,7 @@ function buildTree(sections, states, properties, costCenters, auditFields, showH
       .filter((af) => showHidden || af.is_active !== false)
       .map((af) => ({
         id: af.id, name: af.name, row: af.source_row, isActive: af.is_active !== false,
+        retiredYear: af.retired_year, retiredMonth: af.retired_month,
       }));
   }
 
@@ -536,6 +537,74 @@ async function reactivateNode(kind, id) {
   if (error) throw error;
 }
 
+// × não apaga mais de verdade (isso destruía o histórico/indicadores de
+// tudo que existia embaixo, ou o histórico do próprio campo). Em vez disso
+// grava "retirado a partir do mês X": a linha continua no banco intacta, só
+// some da árvore quando NENHUM dos meses selecionados no filtro é anterior
+// a esse mês (ver isRetiredForVisibleMonths, chamado antes de renderizar
+// cada linha). Enquanto estiver "retirado", o botão vira ↺ (reativar).
+// Compartilhado entre Estado/Propriedade/Centro de custo e Campo — mesma
+// regra nos 4 níveis (ex.: funcionário que saiu no meio do ano).
+function buildRetireButton(kind, node) {
+  const nested = childrenOf(node, kind) ? countDescendantNodes(node, kind) : 0;
+  const isRetired = node.retiredMonth != null;
+  const retireBtn = document.createElement("button");
+  retireBtn.type = "button";
+  retireBtn.className = "row-delete";
+  retireBtn.textContent = isRetired ? "↺" : "×";
+  retireBtn.title = isRetired
+    ? `Reativar ${KIND_LABEL[kind].toLowerCase()} (remove a data de retirada)`
+    : nested > 0
+    ? `Retirar a partir de um mês (leva junto ${nested} item(ns) abaixo)`
+    : `Retirar ${KIND_LABEL[kind].toLowerCase()} a partir de um mês`;
+  retireBtn.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    retireBtn.disabled = true;
+    try {
+      if (isRetired) {
+        if (!confirm(`Reativar "${node.name}"? Ela volta a aparecer normalmente em todos os meses.`)) {
+          retireBtn.disabled = false;
+          return;
+        }
+        await reactivateNode(kind, node.id);
+        node.retiredYear = null;
+        node.retiredMonth = null;
+      } else {
+        const monthsHint = MONTHS.map((m) => `${m.number}-${m.label}`).join(", ");
+        const monthRaw = prompt(
+          `A partir de qual mês "${node.name}" deixa de existir (não aparece mais a partir dele)?\n` +
+            `O histórico e os indicadores dos meses anteriores continuam intactos — nada é apagado.\n${monthsHint}`
+        );
+        if (!monthRaw || !monthRaw.trim()) {
+          retireBtn.disabled = false;
+          return;
+        }
+        const monthDef = MONTH_BY_NUMBER[parseInt(monthRaw.trim(), 10)];
+        if (!monthDef) {
+          alert("Mês inválido — digite um número de 1 a 12.");
+          retireBtn.disabled = false;
+          return;
+        }
+        const warn = nested > 0 ? ` Some junto da árvore com os ${nested} item(ns) dentro dele/dela.` : "";
+        if (!confirm(`Retirar "${node.name}" a partir de ${monthDef.label}?${warn}`)) {
+          retireBtn.disabled = false;
+          return;
+        }
+        await retireNode(kind, node.id, YEAR, monthDef.number);
+        node.retiredYear = YEAR;
+        node.retiredMonth = monthDef.number;
+      }
+      renderTreeTable();
+      renderSummary();
+    } catch (err) {
+      alert("Não foi possível salvar: " + describeError(err, "structure"));
+    } finally {
+      retireBtn.disabled = false;
+    }
+  });
+  return retireBtn;
+}
+
 // ---------- DOM refs ----------
 
 const monthFilterEl = document.getElementById("monthFilter");
@@ -688,7 +757,7 @@ function renderTreeTable() {
     // continua em state.tree pra sempre (nunca some dos indicadores nem do
     // histórico — só não é mais renderizado aqui). "Mostrar campos ocultos"
     // revela de novo, igual ao oculto manual. Ver retireNode/reactivateNode.
-    if (kind !== "campo" && kind !== "section" && !state.showHidden && isRetiredForVisibleMonths(node, months)) {
+    if (kind !== "section" && !state.showHidden && isRetiredForVisibleMonths(node, months)) {
       return;
     }
     const kids = childrenOf(node, kind);
@@ -742,7 +811,7 @@ function renderTreeTable() {
       hiddenBadge.textContent = " (oculto)";
       tdName.appendChild(hiddenBadge);
     }
-    if (kind !== "campo" && node.retiredMonth != null) {
+    if (node.retiredMonth != null) {
       const retiredBadge = document.createElement("span");
       retiredBadge.className = "node-count";
       const monthLabel = (MONTH_BY_NUMBER[node.retiredMonth] || {}).label || node.retiredMonth;
@@ -888,11 +957,12 @@ function renderTreeTable() {
         }
       });
       tdActions.appendChild(toggleBtn);
+      // Retirar/reativar a partir de um mês (funcionário que saiu, item que
+      // parou de existir) — mesmo recurso de Estado/Propriedade/Centro de
+      // custo, ver buildRetireButton. Antes campo não tinha essa opção, só
+      // ocultar (que esconde em TODOS os meses, sem noção de data).
+      tdActions.appendChild(buildRetireButton(kind, node));
     }
-    // Campo não tem × de "apagar" na linha: apagar dados é uma ação de MÊS
-    // (o × dentro de cada célula, em monthCellsFragment), nunca do campo
-    // inteiro de uma vez. Pra aposentar o campo em todos os meses, use
-    // ocultar (🗕).
     if (kind !== "campo" && kind !== "section" && parentArray && isAdmin) {
       // Ocultar/mostrar (reversível, sem relação com mês) — mesmo padrão do
       // campo, agora também em Estado/Propriedade/Centro de custo.
@@ -923,71 +993,7 @@ function renderTreeTable() {
         }
       });
       tdActions.appendChild(toggleBtn);
-
-      // × não apaga mais de verdade (isso destruía o histórico/indicadores
-      // de tudo que existia embaixo — audit_status incluso). Em vez disso
-      // grava "retirado a partir do mês X": a linha (e tudo abaixo dela)
-      // continua no banco intacta, só some da árvore quando NENHUM dos
-      // meses selecionados no filtro é anterior a esse mês (ver
-      // isRetiredForVisibleMonths, chamado lá em cima antes de renderizar
-      // esta linha). Enquanto estiver "retirado", o botão vira ↺ (reativar).
-      const nested = hasKids ? countDescendantNodes(node, kind) : 0;
-      const isRetired = node.retiredMonth != null;
-      const retireBtn = document.createElement("button");
-      retireBtn.type = "button";
-      retireBtn.className = "row-delete";
-      retireBtn.textContent = isRetired ? "↺" : "×";
-      retireBtn.title = isRetired
-        ? `Reativar ${KIND_LABEL[kind].toLowerCase()} (remove a data de retirada)`
-        : nested > 0
-        ? `Retirar a partir de um mês (leva junto ${nested} item(ns) abaixo)`
-        : `Retirar ${KIND_LABEL[kind].toLowerCase()} a partir de um mês`;
-      retireBtn.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        retireBtn.disabled = true;
-        try {
-          if (isRetired) {
-            if (!confirm(`Reativar "${node.name}"? Ela volta a aparecer normalmente em todos os meses.`)) {
-              retireBtn.disabled = false;
-              return;
-            }
-            await reactivateNode(kind, node.id);
-            node.retiredYear = null;
-            node.retiredMonth = null;
-          } else {
-            const monthsHint = MONTHS.map((m) => `${m.number}-${m.label}`).join(", ");
-            const monthRaw = prompt(
-              `A partir de qual mês "${node.name}" deixa de existir (não aparece mais a partir dele)?\n` +
-                `O histórico e os indicadores dos meses anteriores continuam intactos — nada é apagado.\n${monthsHint}`
-            );
-            if (!monthRaw || !monthRaw.trim()) {
-              retireBtn.disabled = false;
-              return;
-            }
-            const monthDef = MONTH_BY_NUMBER[parseInt(monthRaw.trim(), 10)];
-            if (!monthDef) {
-              alert("Mês inválido — digite um número de 1 a 12.");
-              retireBtn.disabled = false;
-              return;
-            }
-            const warn = nested > 0 ? ` Some junto da árvore com os ${nested} item(ns) dentro dele/dela.` : "";
-            if (!confirm(`Retirar "${node.name}" a partir de ${monthDef.label}?${warn}`)) {
-              retireBtn.disabled = false;
-              return;
-            }
-            await retireNode(kind, node.id, YEAR, monthDef.number);
-            node.retiredYear = YEAR;
-            node.retiredMonth = monthDef.number;
-          }
-          renderTreeTable();
-          renderSummary();
-        } catch (err) {
-          alert("Não foi possível salvar: " + describeError(err, "structure"));
-        } finally {
-          retireBtn.disabled = false;
-        }
-      });
-      tdActions.appendChild(retireBtn);
+      tdActions.appendChild(buildRetireButton(kind, node));
     }
     tr.appendChild(tdActions);
     tbody.appendChild(tr);

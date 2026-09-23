@@ -19,6 +19,16 @@ projeto Supabase de produção da QAVI** ("Auditoria - Qavi", projeto
   contém o resultado de todas elas — só use a pasta `migrations/` se estiver
   aplicando em um projeto que já rodava uma versão anterior do schema.
 
+### `migrations/010_retire_audit_fields.sql`
+
+Já aplicada. Estende "retirado a partir de um mês" (mesma ideia de `retired_year`/
+`retired_month` da migração 009) pro **Campo auditado** (`audit_fields`) também —
+antes só existia em `states`/`properties`/`cost_centers`. Caso de uso: um
+funcionário sai da empresa em agosto, o campo de salário dele deve sumir da
+árvore a partir de agosto, mas o histórico de jan-jul continua intacto e contando
+nos indicadores. `audit_fields` já tinha `is_active` (ocultar manual, todos os
+meses); agora ganha o mesmo par de colunas que os outros 3 níveis.
+
 ### `migrations/009_retire_and_hide_states_properties_cost_centers.sql`
 
 Já aplicada. Antes, apagar um Estado, Propriedade ou Centro de custo era um DELETE de

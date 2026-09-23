@@ -138,11 +138,10 @@ Em **qualquer linha** da árvore (para quem tem papel `admin`):
 
 - **+** adiciona um item novo dentro dela — num Estado, adiciona uma Propriedade; numa
   Propriedade, um Centro de custo; num Centro de custo, um Campo.
-- **×** em Estado, Propriedade ou Centro de custo **retira** o item **a partir de um mês
-  escolhido** — nunca apaga nada de verdade (ver "Retirar, ocultar e reativar" abaixo).
-  **Exceção: o campo auditado não tem esse × na linha** — ele nunca é apagado (nem o campo,
-  nem seu histórico) por uma ação de linha; apagar dados de um campo é sempre uma ação de
-  **um mês só** (ver "Ações por mês" abaixo).
+- **×** em qualquer nível (Estado, Propriedade, Centro de custo ou Campo) **retira** o item
+  **a partir de um mês escolhido** — nunca apaga nada de verdade (ver "Retirar, ocultar e
+  reativar" abaixo). Cobre o caso de um funcionário que sai da empresa: o campo de salário
+  dele some da árvore a partir do mês da saída, sem perder o histórico anterior.
 
 Isso cobre o caso de auditoria real: uma propriedade nova entra na empresa → adiciona o Estado
 (se ainda não existir) → adiciona a Propriedade → adiciona os Centros de custo → adiciona os
@@ -162,12 +161,13 @@ tem um "pai" pra clicar. Se a lista de um nível pai estiver vazia (ex.: nenhum 
 ainda na Propriedade escolhida), o painel avisa e pede pra criar esse nível primeiro. Qualquer
 item criado por aqui é gravado no banco na hora, do mesmo jeito que os botões **+** de linha.
 
-## Retirar, ocultar e reativar Estado/Propriedade/Centro de custo (admin)
+## Retirar, ocultar e reativar (admin) — Estado, Propriedade, Centro de custo e Campo
 
-Uma propriedade que a QAVI para de administrar não pode simplesmente ser apagada — isso
-levaria junto todo o histórico e os indicadores dos meses em que ela já foi auditada. Por
-isso Estado, Propriedade e Centro de custo têm dois recursos independentes (mesmos botões
-**🗕/🗗** e **×** da linha, só pra `admin`):
+Uma propriedade que a QAVI para de administrar, ou um funcionário que sai da empresa, não
+pode simplesmente ser apagado — isso levaria junto todo o histórico e os indicadores dos
+meses em que já foi auditado. Por isso **todos os 4 níveis da árvore** (Estado, Propriedade,
+Centro de custo e Campo auditado) têm dois recursos independentes (mesmos botões **🗕/🗗** e
+**×** da linha, só pra `admin`):
 
 - **× (retirar a partir de um mês)** — pede o mês (ex.: "7" pra Julho) e grava isso no item.
   A partir dali:
@@ -192,31 +192,27 @@ Os dois usam o mesmo botão **"Mostrar campos ocultos"** da barra de ferramentas
 de novo (tanto o ocultado manualmente quanto o retirado que já devia ter sumido pelo filtro de
 mês atual) — nenhum dado é perdido em nenhum dos dois casos, só a visibilidade muda.
 
-## Ocultar e renomear campos (admin)
+## Renomear campos (admin)
 
-Além de adicionar/remover, cada **campo auditado** tem dois botões extras (visíveis só pra
-`admin`):
+Além de ocultar/retirar (seção acima, agora comum aos 4 níveis), cada **campo auditado** tem
+um botão extra (visível só pra `admin`):
 
 - **✎ (renomear)** — pede o novo nome e atualiza na hora. Útil quando o nome real do item mudou.
   Isso é uma propriedade do campo em si, então vale pra todos os meses (não faz sentido um campo
   ter nomes diferentes mês a mês).
-- **🗕/🗗 (ocultar/mostrar)** — tira o campo **inteiro**, **em todos os meses**, da visualização
-  padrão sem apagar nada: o histórico de status continua no banco intacto, só some da lista do
-  dia a dia. Serve pra quando algo não precisa mais ser auditado *daqui pra frente*, mas você não
-  quer perder o que já foi registrado.
 
-Campos ocultos ficam de fora por padrão. Um botão **"Mostrar campos ocultos"** na barra de
-ferramentas (só pra admin) revela todos de novo, esmaecidos e marcados com "(oculto)", pra você
-conseguir achar e reativar algum se precisar.
+Campos ocultos ou retirados ficam de fora por padrão. O botão **"Mostrar itens ocultos/
+retirados"** na barra de ferramentas (só pra admin) revela todos de novo, esmaecidos e
+marcados com "(oculto)" ou "(retirado a partir de mês/ano)", pra você conseguir achar e
+reativar algum se precisar.
 
 ## Ações por mês: apagar, editar e ocultar valem só pro mês, não pro campo inteiro
 
-Isso vale só pro **campo auditado** (o nível dentro do centro de custo que de fato recebe
-status mês a mês) — Estado, Propriedade e Centro de custo têm sua própria noção de mês (o ×
-de retirar, ver seção acima), mas é uma retirada de item inteiro a partir de um ponto no
-tempo, diferente disto aqui: um campo é uma linha só na árvore, mas cada mês é uma coluna com seus
-próprios dados — então apagar, editar ou ocultar **um mês** nunca afeta os outros, nem depende
-de quais meses estão marcados no filtro do topo. Cada célula de mês tem sua própria ação:
+Isso é uma camada a mais, só do **campo auditado** — diferente do × de retirar (que tira o
+item inteiro da árvore a partir de um mês, ver seção acima): um campo é uma linha só na
+árvore, mas cada mês é uma coluna com seus próprios dados — então apagar, editar ou ocultar
+**um mês** nunca afeta os outros, nem depende de quais meses estão marcados no filtro do
+topo. Cada célula de mês tem sua própria ação:
 
 - **Editar** — clicar no selo de status de uma célula (ex.: a célula de Junho) abre o painel
   lateral já naquele mês, não sempre no primeiro mês visível da linha. O seletor "Mês" no topo do
