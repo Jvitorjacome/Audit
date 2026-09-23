@@ -444,6 +444,23 @@ function rebuildTreeFromCache() {
   );
 }
 
+// rebuildTreeFromCache() reconstrói state.tree do zero a partir de
+// rawHierarchy, sem rede. Renomear/ocultar/retirar/reordenar só atualizavam
+// o node já renderizado (state.tree), nunca a linha crua correspondente em
+// rawHierarchy — então a edição sumia da tela (embora já salva no banco)
+// assim que algo disparava um rebuild (ex.: ligar "Mostrar ocultos"). Toda
+// mutação bem-sucedida precisa espelhar aqui também.
+const RAW_HIERARCHY_KEY_BY_TABLE = {
+  sections: "sections", states: "states", properties: "properties",
+  cost_centers: "costCenters", audit_fields: "auditFields",
+};
+function patchRawRow(table, id, patch) {
+  if (!rawHierarchy) return;
+  const key = RAW_HIERARCHY_KEY_BY_TABLE[table];
+  const row = key && rawHierarchy[key] && rawHierarchy[key].find((r) => r.id === id);
+  if (row) Object.assign(row, patch);
+}
+
 // O Supabase/PostgREST limita cada resposta a 1000 linhas por padrão. A
 // tabela audit_status já passou disso (cresce a cada mês/campo preenchido) —
 // uma busca sem paginação simplesmente descarta o resto em silêncio, sem
@@ -533,6 +550,8 @@ async function reorderCampos(campos) {
   );
   const failed = results.find((r) => r.error);
   if (failed) throw failed.error;
+  campos.forEach((c, i) => patchRawRow("audit_fields", c.id, { sort_order: i }));
+  if (rawHierarchy) rawHierarchy.auditFields.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 }
 
 // Arrastar-e-soltar pra reordenar campos dentro do MESMO centro de custo
@@ -628,6 +647,7 @@ function buildRetireButton(kind, node) {
         await reactivateNode(kind, node.id);
         node.retiredYear = null;
         node.retiredMonth = null;
+        patchRawRow(HIERARCHY[kind].table, node.id, { retired_year: null, retired_month: null });
       } else {
         const monthsHint = MONTHS.map((m) => `${m.number}-${m.label}`).join(", ");
         const monthRaw = prompt(
@@ -652,6 +672,7 @@ function buildRetireButton(kind, node) {
         await retireNode(kind, node.id, YEAR, monthDef.number);
         node.retiredYear = YEAR;
         node.retiredMonth = monthDef.number;
+        patchRawRow(HIERARCHY[kind].table, node.id, { retired_year: YEAR, retired_month: monthDef.number });
       }
       renderTreeTable();
       renderSummary();
@@ -1008,6 +1029,7 @@ function renderTreeTable() {
         try {
           await renameCampo(node.id, newName.trim());
           node.name = newName.trim();
+          patchRawRow("audit_fields", node.id, { name: node.name });
           renderTreeTable();
         } catch (err) {
           alert("Não foi possível renomear: " + describeError(err, "structure"));
@@ -1029,6 +1051,7 @@ function renderTreeTable() {
         try {
           await setCampoActive(node.id, !wasActive);
           node.isActive = !wasActive;
+          patchRawRow("audit_fields", node.id, { is_active: node.isActive });
           if (!state.showHidden && wasActive) {
             const idx = parentArray.indexOf(node);
             if (idx >= 0) parentArray.splice(idx, 1);
@@ -1065,6 +1088,7 @@ function renderTreeTable() {
         try {
           await setNodeActive(kind, node.id, !wasActive);
           node.isActive = !wasActive;
+          patchRawRow(HIERARCHY[kind].table, node.id, { is_active: node.isActive });
           if (!state.showHidden && wasActive) {
             const idx = parentArray.indexOf(node);
             if (idx >= 0) parentArray.splice(idx, 1);
