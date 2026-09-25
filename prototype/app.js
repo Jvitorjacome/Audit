@@ -78,6 +78,21 @@ function childKind(kind) {
   return { section: "channel", channel: "property", property: "centro", centro: "campo" }[kind] || null;
 }
 
+// Filtro por propriedade (condomínio) da árvore da aba Auditoria — nunca
+// filtra por "quem é filho de quem" abaixo da propriedade (centro/campo
+// sempre passam: já estão dentro de uma propriedade que bateu), só decide
+// se ESSA propriedade (ou algum ramo de seção/estado que leva até ela) deve
+// aparecer. Property que não bate = a propriedade inteira some (junto com
+// os centros de custo e campos dela); seção/estado sem nenhuma propriedade
+// visível também somem, pra não sobrar cabeçalho vazio na árvore.
+function propertyFilterMatches(node, kind) {
+  if (state.propertyFilter === PROPERTY_FILTER_ALL) return true;
+  if (kind === "centro" || kind === "campo") return true;
+  if (kind === "property") return node.name === state.propertyFilter;
+  const kids = childrenOf(node, kind) || [];
+  return kids.some((child) => propertyFilterMatches(child, childKind(kind)));
+}
+
 const KIND_LABEL = { section: "Seção", channel: "Estado", property: "Propriedade", centro: "Centro de custo", campo: "Campo auditado", variavel: "Conta variável" };
 const KIND_ADD_LABEL = { section: "Estado", channel: "Propriedade", property: "Centro de custo", centro: "Campo" };
 
@@ -122,12 +137,17 @@ function saveViewPrefs() {
 }
 
 const savedPrefs = loadViewPrefs();
+// Filtro por propriedade (condomínio) da aba Auditoria — só de tela, não
+// persiste entre sessões (senão o usuário podia voltar depois e "sumir"
+// propriedades sem lembrar por quê). Ver PROPERTY_FILTER_ALL/propertyFilterMatches.
+const PROPERTY_FILTER_ALL = "__all__";
 let state = {
   tree: [],
   cells: {},
   visibleMonths: (savedPrefs && savedPrefs.visibleMonths) || MONTHS.filter((m) => m.inOriginal).map((m) => m.key),
   collapsed: (savedPrefs && savedPrefs.collapsed) || {},
   showHidden: (savedPrefs && savedPrefs.showHidden) || false,
+  propertyFilter: PROPERTY_FILTER_ALL,
   ocorrenciaOptions: {},
   variableEntries: [],
 };
@@ -700,6 +720,7 @@ function buildRetireButton(kind, node) {
 // ---------- DOM refs ----------
 
 const monthFilterEl = document.getElementById("monthFilter");
+const propertyFilterEl = document.getElementById("propertyFilterSelect");
 const summaryEl = document.getElementById("summary");
 const drawerEl = document.getElementById("drawer");
 const drawerBackdrop = document.getElementById("drawerBackdrop");
@@ -710,6 +731,52 @@ const loadErrorEl = document.getElementById("loadError");
 
 function visibleMonthList() {
   return MONTHS.filter((m) => state.visibleMonths.includes(m.key));
+}
+
+// Nomes de propriedade (condomínio) atualmente na árvore, pra popular o
+// <select> do filtro — reflete showHidden (propriedade oculta não aparece
+// como opção enquanto "Mostrar ocultos" estiver desligado, igual à árvore).
+function collectPropertyNames() {
+  const names = new Set();
+  for (const section of state.tree) {
+    for (const channel of section.channels || []) {
+      for (const property of channel.properties || []) {
+        if (property.name) names.add(property.name);
+      }
+    }
+  }
+  return Array.from(names).sort((a, b) => a.localeCompare(b, "pt-BR"));
+}
+
+function renderPropertyFilter() {
+  if (!propertyFilterEl) return;
+  const names = collectPropertyNames();
+  // Propriedade escolhida sumiu da lista (renomeada/oculta/excluída) — volta
+  // pra "todas" em vez de deixar a árvore presa num filtro que não bate com
+  // nada.
+  if (state.propertyFilter !== PROPERTY_FILTER_ALL && !names.includes(state.propertyFilter)) {
+    state.propertyFilter = PROPERTY_FILTER_ALL;
+  }
+  propertyFilterEl.innerHTML = "";
+  const allOpt = document.createElement("option");
+  allOpt.value = PROPERTY_FILTER_ALL;
+  allOpt.textContent = "Todas as propriedades";
+  propertyFilterEl.appendChild(allOpt);
+  for (const name of names) {
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name;
+    propertyFilterEl.appendChild(opt);
+  }
+  propertyFilterEl.value = state.propertyFilter;
+  // .onchange (não addEventListener): o <select> é reaproveitado a cada
+  // render (só as <option> são recriadas), então addEventListener acumularia
+  // um handler novo por render.
+  propertyFilterEl.onchange = () => {
+    state.propertyFilter = propertyFilterEl.value;
+    renderTreeTable();
+    renderSummary();
+  };
 }
 
 function renderMonthFilter() {
@@ -820,6 +887,7 @@ function auditBarCell(node, kind, months) {
 // ---------- tree rendering ----------
 
 function renderTreeTable() {
+  renderPropertyFilter();
   const months = visibleMonthList();
   const table = document.createElement("table");
   table.className = "dre-table";
@@ -851,6 +919,13 @@ function renderTreeTable() {
     // histórico — só não é mais renderizado aqui). "Mostrar campos ocultos"
     // revela de novo, igual ao oculto manual. Ver retireNode/reactivateNode.
     if (kind !== "section" && !state.showHidden && isRetiredForVisibleMonths(node, months)) {
+      return;
+    }
+    // Filtro de propriedade (condomínio) selecionado no topo da aba — ver
+    // propertyFilterMatches. Aplica em section/channel/property (campo e
+    // centro sempre passam, porque já estão dentro de uma propriedade que
+    // bateu quando chegam aqui).
+    if (!propertyFilterMatches(node, kind)) {
       return;
     }
     const kids = childrenOf(node, kind);

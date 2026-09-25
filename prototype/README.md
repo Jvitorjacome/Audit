@@ -132,6 +132,16 @@ Só o **campo auditado** tem os 5 status. Estado, Propriedade e Centro de custo 
 lugar disso, uma barra de progresso somando os campos abaixo deles (% verificado em azul,
 aviso em vermelho só quando há algum "Não Conforme" nos descendentes).
 
+## Filtro por propriedade (condomínio)
+
+Na aba Auditoria, ao lado do filtro de mês, tem um seletor **"Propriedade"** — escolher uma
+(ex.: "Ma Plage") deixa a árvore só com o ramo daquela propriedade (Estado → Propriedade →
+Centro de custo → Campo), escondendo as demais propriedades do mesmo Estado/Seção pra facilitar
+auditar uma de cada vez, sem precisar rolar por todas. "Todas as propriedades" (padrão) volta a
+mostrar tudo. A lista de opções vem das propriedades atualmente visíveis na árvore (respeita
+oculto/"Mostrar itens ocultos"); é só um filtro de tela — não persiste entre sessões e não afeta
+os indicadores nem o histórico, só o que aparece na aba Auditoria naquele momento.
+
 ## O sistema é dinâmico: adicionar e remover em qualquer nível (admin)
 
 Em **qualquer linha** da árvore (para quem tem papel `admin`):
