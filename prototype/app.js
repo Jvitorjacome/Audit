@@ -93,6 +93,32 @@ function propertyFilterMatches(node, kind) {
   return kids.some((child) => propertyFilterMatches(child, childKind(kind)));
 }
 
+// Filtro por status (Conforme/Não Conforme/Não se aplica/Não verificado) da
+// aba Auditoria — ao contrário do filtro de propriedade, aqui CADA nível
+// precisa do próprio critério (status é dado do campo/conta variável, não
+// "herda" de um ancestral que bateu): campo bate se QUALQUER mês
+// atualmente visível tiver esse status (ver cellAggregateTone); centro bate
+// se algum campo dele bater OU alguma conta variável dele tiver esse
+// status; seção/estado/propriedade só repassam a pergunta pros filhos.
+// Ignora (não conta como match) ramos escondidos por retirada/"mostrar
+// ocultos" — senão um ancestral podia "bater" só por causa de um campo que
+// nem vai aparecer de qualquer forma.
+function statusFilterMatches(node, kind, months) {
+  if (state.statusFilter === STATUS_FILTER_ALL) return true;
+  if (!isVisibleForRetirement(node, kind, months)) return false;
+  if (kind === "campo") {
+    return months.some((m) => cellAggregateTone(node.id, m.key).statusKey === state.statusFilter);
+  }
+  if (kind === "centro") {
+    const campoMatch = (node.campos || []).some((c) => statusFilterMatches(c, "campo", months));
+    if (campoMatch) return true;
+    const entries = (state.variableEntries || []).filter((e) => e.cost_center_id === node.id);
+    return entries.some((e) => cellAggregateToneFromCell(rowToCell(e)).statusKey === state.statusFilter);
+  }
+  const kids = childrenOf(node, kind) || [];
+  return kids.some((child) => statusFilterMatches(child, childKind(kind), months));
+}
+
 const KIND_LABEL = { section: "Seção", channel: "Estado", property: "Propriedade", centro: "Centro de custo", campo: "Campo auditado", variavel: "Conta variável" };
 const KIND_ADD_LABEL = { section: "Estado", channel: "Propriedade", property: "Centro de custo", centro: "Campo" };
 
@@ -141,6 +167,10 @@ const savedPrefs = loadViewPrefs();
 // persiste entre sessões (senão o usuário podia voltar depois e "sumir"
 // propriedades sem lembrar por quê). Ver PROPERTY_FILTER_ALL/propertyFilterMatches.
 const PROPERTY_FILTER_ALL = "__all__";
+// Filtro por status (Conforme/Não Conforme/Não se aplica/Não verificado) —
+// mesma ideia do de propriedade: só de tela, não persiste. O valor, quando
+// ligado, é sempre um de STATUS_OPTIONS (ver statusFilterMatches).
+const STATUS_FILTER_ALL = "__all__";
 let state = {
   tree: [],
   cells: {},
@@ -148,6 +178,7 @@ let state = {
   collapsed: (savedPrefs && savedPrefs.collapsed) || {},
   showHidden: (savedPrefs && savedPrefs.showHidden) || false,
   propertyFilter: PROPERTY_FILTER_ALL,
+  statusFilter: STATUS_FILTER_ALL,
   ocorrenciaOptions: {},
   variableEntries: [],
 };
@@ -185,19 +216,28 @@ function statusTone(value) {
 // (que não têm um "id + monthKey" pra buscar em state.cells — já chegam
 // prontas como uma linha do banco, convertida com rowToCell).
 function cellAggregateToneFromCell(cell) {
-  if (cell.isHidden) return { tone: "hidden", label: "Oculto" };
-  let naoConforme = 0, naoVerificado = 0;
+  // statusKey é o valor "cru" (igual a STATUS_OPTIONS) usado pelo filtro de
+  // status da aba Auditoria — null quando a célula não conta pra nenhuma
+  // categoria (oculta: já tem seu próprio filtro "Mostrar ocultos").
+  if (cell.isHidden) return { tone: "hidden", label: "Oculto", statusKey: null };
+  let naoConforme = 0, naoVerificado = 0, naoSeAplica = 0;
   for (const f of STATUS_FIELDS) {
     const v = cell[f.key] || "Não verificado";
     if (v === "Não Conforme") naoConforme++;
     else if (v === "Não verificado") naoVerificado++;
+    else if (v === "Não se aplica") naoSeAplica++;
   }
   // "Não conforme" some quando marcam "Corrigido? = Sim" no painel — o selo
   // continua igual (não esconde que houve um erro), só ganha um ✓ discreto
   // do lado pra diferenciar "ainda pendente de correção" de "já corrigido".
-  if (naoConforme > 0) return { tone: "div", label: "Não conforme", corrected: cell.corrigido === "Sim" };
-  if (naoVerificado > 0) return { tone: "unv", label: "Pendente" };
-  return { tone: "ok", label: "Conforme" };
+  if (naoConforme > 0) return { tone: "div", label: "Não conforme", corrected: cell.corrigido === "Sim", statusKey: "Não Conforme" };
+  if (naoVerificado > 0) return { tone: "unv", label: "Pendente", statusKey: "Não verificado" };
+  // Só vira "Não se aplica" quando os 5 indicadores estão nessa opção — um
+  // só "Não se aplica" misturado com Conforme continua contando como
+  // Conforme (mistura parcial não é o mesmo que "o campo inteiro não se
+  // aplica nesse mês").
+  if (naoSeAplica === STATUS_FIELDS.length) return { tone: "na", label: "Não se aplica", statusKey: "Não se aplica" };
+  return { tone: "ok", label: "Conforme", statusKey: "Conforme" };
 }
 function cellDetailTitleFromCell(cell) {
   if (cell.isHidden) return "Oculto neste mês — clique pra editar ou reexibir.";
@@ -382,6 +422,13 @@ function isRetiredForVisibleMonths(node, months) {
   if (node.retiredMonth == null) return false;
   const retiredYear = node.retiredYear == null ? YEAR : node.retiredYear;
   return months.every((m) => (YEAR === retiredYear ? m.number >= node.retiredMonth : YEAR > retiredYear));
+}
+// Mesma regra do early-return de retirada em renderNode, extraída pra
+// statusFilterMatches também respeitar (senão um campo/centro retirado-e-
+// escondido podia fazer um ancestral "aparecer só pra sumir de novo",
+// contando como match mesmo sem nenhum descendente de fato visível).
+function isVisibleForRetirement(node, kind, months) {
+  return kind === "section" || state.showHidden || !isRetiredForVisibleMonths(node, months);
 }
 
 // ---------- Supabase: carregar árvore + status ----------
@@ -918,7 +965,7 @@ function renderTreeTable() {
     // continua em state.tree pra sempre (nunca some dos indicadores nem do
     // histórico — só não é mais renderizado aqui). "Mostrar campos ocultos"
     // revela de novo, igual ao oculto manual. Ver retireNode/reactivateNode.
-    if (kind !== "section" && !state.showHidden && isRetiredForVisibleMonths(node, months)) {
+    if (!isVisibleForRetirement(node, kind, months)) {
       return;
     }
     // Filtro de propriedade (condomínio) selecionado no topo da aba — ver
@@ -926,6 +973,13 @@ function renderTreeTable() {
     // centro sempre passam, porque já estão dentro de uma propriedade que
     // bateu quando chegam aqui).
     if (!propertyFilterMatches(node, kind)) {
+      return;
+    }
+    // Filtro de status (Conforme/Não Conforme/Não se aplica/Não verificado)
+    // selecionado no topo da aba — ver statusFilterMatches. Ao contrário do
+    // filtro de propriedade, esse afeta section/channel/property/centro/campo
+    // (cada um checa se tem descendente batendo, campo checa o próprio status).
+    if (!statusFilterMatches(node, kind, months)) {
       return;
     }
     const kids = childrenOf(node, kind);
@@ -1210,6 +1264,13 @@ function renderTreeTable() {
   // do mês em que ela de fato existe; nos outros meses visíveis mostra um
   // traço neutro, não clicável.
   function renderVariableEntryRow(entry, depth) {
+    // Conta variável não passa pelo renderNode (não faz parte de
+    // section/channel/property/centro/campo) — o filtro de status precisa
+    // do próprio check aqui, olhando só o mês fixo da conta.
+    if (state.statusFilter !== STATUS_FILTER_ALL) {
+      const { statusKey } = cellAggregateToneFromCell(rowToCell(entry));
+      if (statusKey !== state.statusFilter) return;
+    }
     const monthDef = MONTH_BY_NUMBER[entry.month];
     const monthLabel = monthDef ? monthDef.label : `mês ${entry.month}`;
 
@@ -1755,6 +1816,33 @@ document.addEventListener("keydown", (e) => {
 });
 
 // ---------- toolbar ----------
+
+// Filtro de status: opções fixas (não dependem de dados carregados, ao
+// contrário do de propriedade), então monta uma vez só — muda só o
+// state.statusFilter e redesenha a árvore (statusFilterMatches, ligado a
+// renderNode/renderVariableEntryRow).
+{
+  const statusFilterEl = document.getElementById("statusFilterSelect");
+  if (statusFilterEl) {
+    const allOpt = document.createElement("option");
+    allOpt.value = STATUS_FILTER_ALL;
+    allOpt.textContent = "Todos os status";
+    statusFilterEl.appendChild(allOpt);
+    // Ordem pedida: problemas primeiro (Não conforme), depois o resto.
+    for (const value of ["Não Conforme", "Conforme", "Não se aplica", "Não verificado"]) {
+      const opt = document.createElement("option");
+      opt.value = value;
+      opt.textContent = value;
+      statusFilterEl.appendChild(opt);
+    }
+    statusFilterEl.value = state.statusFilter;
+    statusFilterEl.addEventListener("change", () => {
+      state.statusFilter = statusFilterEl.value;
+      renderTreeTable();
+      renderSummary();
+    });
+  }
+}
 
 document.getElementById("btnAllMonths").addEventListener("click", () => {
   state.visibleMonths = MONTHS.map((m) => m.key);

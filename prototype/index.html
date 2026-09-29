@@ -82,14 +82,19 @@
       <span class="legend-item"><span class="status-badge status-badge-ok">Conforme</span></span>
       <span class="legend-item"><span class="status-badge status-badge-div">Não conforme</span></span>
       <span class="legend-item"><span class="status-badge status-badge-unv">Pendente</span></span>
+      <span class="legend-item"><span class="status-badge status-badge-na">Não se aplica</span></span>
       <span class="legend-item"><span class="legend-dot"></span> Barra = % verificado (Estado, Propriedade, Centro de custo)</span>
     </div>
 
     <div class="toolbar">
       <div class="toolbar-filters">
-        <label class="field field-property">
+        <label class="field field-filter">
           <span class="field-label">Propriedade</span>
           <select class="select" id="propertyFilterSelect"></select>
+        </label>
+        <label class="field field-filter">
+          <span class="field-label">Status</span>
+          <select class="select" id="statusFilterSelect"></select>
         </label>
         <div class="month-filter" id="monthFilter"></div>
       </div>

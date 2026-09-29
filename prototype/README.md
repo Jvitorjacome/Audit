@@ -142,6 +142,25 @@ mostrar tudo. A lista de opções vem das propriedades atualmente visíveis na �
 oculto/"Mostrar itens ocultos"); é só um filtro de tela — não persiste entre sessões e não afeta
 os indicadores nem o histórico, só o que aparece na aba Auditoria naquele momento.
 
+## Filtro por status (Conforme / Não Conforme / Não se aplica / Não verificado)
+
+Ao lado do filtro de Propriedade tem um seletor **"Status"**, com as mesmas 4 opções que os 5
+indicadores de cada campo podem receber. Escolher uma (ex.: "Não verificado") deixa a árvore só
+com os campos e contas variáveis que têm esse status em pelo menos um dos meses **atualmente
+visíveis no filtro de mês** — é assim que ele fica "conectado" aos outros filtros: estreitar o
+mês (ex.: só Agosto) ou a propriedade primeiro, e só depois escolher o status, dá o resultado
+mais preciso ("quais campos da Ma Plage ainda não foram verificados em Agosto", por exemplo).
+Como Propriedade, Estado/Seção/Centro de custo somem junto quando não sobra nenhum descendente
+batendo, e "Todos os status" (padrão) volta a mostrar tudo. Também não persiste entre sessões e
+não muda indicadores nem histórico — só o que aparece na árvore.
+
+Um efeito colateral: o selo da célula agora também pode mostrar **"Não se aplica"** (cor própria,
+igual ao valor que já existia nos 5 indicadores individuais) — antes, um campo com os 5
+indicadores marcados como "Não se aplica" naquele mês aparecia como "Conforme" por padrão; agora
+tem selo e cor dele mesmo, pra dar pra filtrar e enxergar separado. Misturar "Não se aplica" com
+outros valores (ex.: 4 Conforme + 1 Não se aplica) continua contando como "Conforme" — só vira
+"Não se aplica" quando os 5 indicadores do mês estão nessa opção.
+
 ## O sistema é dinâmico: adicionar e remover em qualquer nível (admin)
 
 Em **qualquer linha** da árvore (para quem tem papel `admin`):
