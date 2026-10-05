@@ -101,6 +101,8 @@ Aplique esses dois mapeamentos automaticamente. Se aparecer um "sem responsável
 | Gilvanete (aparece como `gilvaneterodrigues400@gmail.com` na Jestor) → mencionar Jeziely Virgínia | U07L4M0JBP0 |
 | Roger Vinicius (aparece como Roger Oliveira no Slack) | U0A4RHLFX99 |
 | Vinícius Fontes | U0749A60151 |
+| Thiago Peixoto | U08D1CXK4CB |
+| Giovanna Medeiros | U05RLEVL99D |
 
 Para nomes que **não** estão nesta lista, tente achar via `slack_search_users` (nome, ou o e-mail que aparece no campo `responsavel_pelo_cartao_1.email` da Jestor). Se não achar, inclua o nome no relatório **sem** menção (texto puro) — não invente um Slack ID.
 
