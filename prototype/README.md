@@ -292,6 +292,15 @@ digite o valor novo, e ele já fica salvo e selecionado na hora — nenhuma outr
 sistema depois precisa reconfigurar nada. Serve pra quando entra funcionário novo, aparece um tipo
 de ocorrência que ainda não existia, etc.
 
+Pra renomear ou apagar uma dessas opções (não só adicionar), tem um botão **⚙** bem pequeno ao
+lado do dropdown (só pra `admin`) que abre um painel lateral listando todas as opções daquele
+campo, cada uma com ✎ (renomear) e × (apagar) — igual ao padrão de ✎/× já usado no resto do
+sistema. Renomear vale pra **todo o sistema de uma vez**: além de mudar a opção em si, atualiza
+na hora qualquer lançamento (campo fixo ou conta variável) que já estava usando o texto antigo,
+pra nada ficar "desatualizado". Apagar só tira a opção da lista de escolhas futuras — lançamentos
+que já usavam ela continuam mostrando o texto normalmente (nunca apaga histórico de auditoria por
+causa de uma mudança na lista de opções).
+
 ### Limpar campos
 
 No painel de um campo, cada um dos 5 indicadores e dos 4 campos de ocorrência tem um **×** ao

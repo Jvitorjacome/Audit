@@ -743,6 +743,10 @@ tr:hover > td .row-add, .row-add:focus-visible { opacity: 1; }
   cursor: pointer;
   font-size: 1rem;
   line-height: 1;
+  flex-shrink: 0;
+  /* .theme-toggle é fixed, top:16px/right:16px, 34×34 — sem essa margem o ✕
+     do drawer nasce embaixo dele (mesmo canto), escondido e inclicável. */
+  margin-right: 38px;
 }
 
 .field { display: flex; flex-direction: column; gap: 4px; font-size: 0.82rem; }
@@ -768,6 +772,28 @@ tr:hover > td .row-add, .row-add:focus-visible { opacity: 1; }
   cursor: pointer;
 }
 .field-clear:hover { border-color: var(--div-fg); color: var(--div-fg); }
+.field-manage:hover { border-color: var(--accent); color: var(--brand); }
+
+/* Painel "Gerenciar opções" (ocorrência dinâmica) — uma lista simples, cada
+   linha com o texto da opção + ✎/× bem pequenos, igual ao resto da árvore. */
+.manage-options-empty { color: var(--text-muted); font-size: 0.85rem; }
+.manage-option-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.manage-option-row:last-child { border-bottom: none; }
+.manage-option-name { flex: 1; min-width: 0; overflow-wrap: break-word; font-size: 0.88rem; }
+/* .row-rename/.row-delete nascem quase invisíveis (só "acendem" no hover da
+   linha da árvore, ver .row-delete/.row-rename acima) — aqui não tem tr/td
+   pra disparar isso, e o painel inteiro já É a ação de gerenciar, então
+   ficam sempre visíveis, só um pouco mais discretos que no hover. */
+.manage-option-row .row-rename,
+.manage-option-row .row-delete { opacity: 0.55; }
+.manage-option-row .row-rename:hover,
+.manage-option-row .row-delete:hover { opacity: 1; }
 
 .btn-clear-all {
   align-self: flex-start;

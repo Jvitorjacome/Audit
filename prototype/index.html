@@ -200,6 +200,19 @@
   <button class="btn btn-primary" id="createSubmit" type="button">Criar</button>
 </aside>
 
+<div class="backdrop" id="manageOptionsBackdrop"></div>
+<aside class="drawer" id="manageOptionsPanel">
+  <div class="drawer-header">
+    <div>
+      <span class="drawer-kind">Gerenciar opções</span>
+      <h2 id="manageOptionsTitle">Ocorrências por tipo</h2>
+      <p>Renomear ou apagar aqui vale pra todo o sistema, não só este lançamento.</p>
+    </div>
+    <button class="drawer-close" id="manageOptionsClose" type="button" aria-label="Fechar">✕</button>
+  </div>
+  <div id="manageOptionsList"></div>
+</aside>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script src="supabaseClient.js"></script>

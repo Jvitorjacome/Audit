@@ -575,9 +575,12 @@ async function loadAll() {
   rawHierarchy = { sections, states, properties, costCenters, auditFields };
   rebuildTreeFromCache();
 
+  // { id, value } (não só a string) -- o id é o que o painel "Gerenciar
+  // opções" usa pra renomear/apagar uma opção específica (ver
+  // renameOcorrenciaOption/deleteOcorrenciaOption).
   state.ocorrenciaOptions = {};
   for (const row of ocorrenciaOptionsRows) {
-    (state.ocorrenciaOptions[row.field_key] ||= []).push(row.value);
+    (state.ocorrenciaOptions[row.field_key] ||= []).push({ id: row.id, value: row.value });
   }
 
   state.variableEntries = variableEntries;
@@ -586,11 +589,47 @@ async function loadAll() {
 
 async function addOcorrenciaOption(fieldKey, value) {
   const sortOrder = (state.ocorrenciaOptions[fieldKey] || []).length;
-  const { error } = await sb.from("ocorrencia_options").insert({
+  const { data, error } = await sb.from("ocorrencia_options").insert({
     field_key: fieldKey, value, sort_order: sortOrder, created_by: currentUser.id,
-  });
+  }).select().single();
   if (error) throw error;
-  (state.ocorrenciaOptions[fieldKey] ||= []).push(value);
+  (state.ocorrenciaOptions[fieldKey] ||= []).push({ id: data.id, value: data.value });
+}
+
+// Renomear uma opção afeta todo o sistema (não só o lançamento que estava
+// aberto): atualiza a opção em si, E todo audit_status/variable_entries que
+// já usava o texto antigo -- senão esses lançamentos ficavam "órfãos",
+// mostrando um texto que não existe mais na lista de opções. Espelha tudo
+// isso localmente também (state.ocorrenciaOptions, state.cells já
+// carregadas, state.variableEntries) pra não precisar recarregar a página.
+async function renameOcorrenciaOption(fieldKey, id, oldValue, newValue) {
+  const { error } = await sb.from("ocorrencia_options").update({ value: newValue }).eq("id", id);
+  if (error) throw error;
+  const column = OCORRENCIA_FIELDS.find((f) => f.key === fieldKey).column;
+  const { error: e1 } = await sb.from("audit_status").update({ [column]: newValue }).eq(column, oldValue);
+  if (e1) throw e1;
+  const { error: e2 } = await sb.from("variable_entries").update({ [column]: newValue }).eq(column, oldValue);
+  if (e2) throw e2;
+
+  const opt = (state.ocorrenciaOptions[fieldKey] || []).find((o) => o.id === id);
+  if (opt) opt.value = newValue;
+  for (const cell of Object.values(state.cells)) {
+    if (cell[fieldKey] === oldValue) cell[fieldKey] = newValue;
+  }
+  for (const entry of state.variableEntries || []) {
+    if (entry[column] === oldValue) entry[column] = newValue;
+  }
+}
+
+// × não cascateia: apaga só a opção da lista (não aparece mais pra escolher
+// de novo), mas lançamentos que já usavam o texto continuam com ele —
+// mesma filosofia do resto do app (nunca apaga histórico de auditoria por
+// causa de uma mudança estrutural). O <select> mostra esse valor "órfão"
+// como opção extra quando é o valor atual da célula (ver renderDrawerBody).
+async function deleteOcorrenciaOption(fieldKey, id) {
+  const { error } = await sb.from("ocorrencia_options").delete().eq("id", id);
+  if (error) throw error;
+  state.ocorrenciaOptions[fieldKey] = (state.ocorrenciaOptions[fieldKey] || []).filter((o) => o.id !== id);
 }
 
 async function addNode(kind, parentId, siblingCount, rawName) {
@@ -1709,13 +1748,24 @@ function renderDrawerBody(ctx) {
     blankOpt.textContent = "— selecionar —";
     if (!value) blankOpt.selected = true;
     select.appendChild(blankOpt);
-    const opts = f.dynamic ? (state.ocorrenciaOptions[f.key] || []) : f.options;
+    const opts = f.dynamic ? (state.ocorrenciaOptions[f.key] || []).map((o) => o.value) : f.options;
     for (const opt of opts) {
       const o = document.createElement("option");
       o.value = opt;
       o.textContent = opt;
       if (opt === value) o.selected = true;
       select.appendChild(o);
+    }
+    // Valor atual não está mais na lista (opção foi apagada do sistema, ver
+    // deleteOcorrenciaOption) — mantém aparecendo nesta célula em vez de
+    // "sumir" pro branco, já que o histórico continua intacto; só não entra
+    // mais como opção pra escolher de novo.
+    if (value && f.dynamic && !opts.includes(value)) {
+      const orphanOpt = document.createElement("option");
+      orphanOpt.value = value;
+      orphanOpt.textContent = value;
+      orphanOpt.selected = true;
+      select.appendChild(orphanOpt);
     }
     if (f.dynamic && isAdmin) {
       const addOpt = document.createElement("option");
@@ -1782,6 +1832,15 @@ function renderDrawerBody(ctx) {
       });
       row.appendChild(clearBtn);
     }
+    if (f.dynamic && isAdmin) {
+      const manageBtn = document.createElement("button");
+      manageBtn.type = "button";
+      manageBtn.className = "field-clear field-manage";
+      manageBtn.title = `Editar ou apagar opções de "${f.label}"`;
+      manageBtn.textContent = "⚙";
+      manageBtn.addEventListener("click", () => openManageOptionsPanel(f));
+      row.appendChild(manageBtn);
+    }
     wrap.appendChild(row);
     fieldsEl.appendChild(wrap);
   }
@@ -1817,6 +1876,7 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     closeDrawer();
     closeCreatePanel();
+    closeManageOptionsPanel();
   }
 });
 
@@ -1967,6 +2027,101 @@ function closeCreatePanel() {
   createPanel.classList.remove("drawer-open");
   createBackdrop.classList.remove("backdrop-visible");
 }
+
+// ---------- gerenciar opções de ocorrência (editar/apagar, admin) ----------
+
+const manageOptionsBackdrop = document.getElementById("manageOptionsBackdrop");
+const manageOptionsPanel = document.getElementById("manageOptionsPanel");
+const manageOptionsTitleEl = document.getElementById("manageOptionsTitle");
+const manageOptionsListEl = document.getElementById("manageOptionsList");
+let manageOptionsField = null;
+
+function openManageOptionsPanel(field) {
+  manageOptionsField = field;
+  manageOptionsTitleEl.textContent = field.label;
+  renderManageOptionsList();
+  manageOptionsPanel.classList.add("drawer-open");
+  manageOptionsBackdrop.classList.add("backdrop-visible");
+}
+function closeManageOptionsPanel() {
+  manageOptionsField = null;
+  manageOptionsPanel.classList.remove("drawer-open");
+  manageOptionsBackdrop.classList.remove("backdrop-visible");
+}
+
+function renderManageOptionsList() {
+  if (!manageOptionsField) return;
+  const field = manageOptionsField;
+  manageOptionsListEl.innerHTML = "";
+  const opts = state.ocorrenciaOptions[field.key] || [];
+  if (!opts.length) {
+    const empty = document.createElement("p");
+    empty.className = "manage-options-empty";
+    empty.textContent = "Nenhuma opção cadastrada ainda.";
+    manageOptionsListEl.appendChild(empty);
+    return;
+  }
+  for (const opt of opts) {
+    const row = document.createElement("div");
+    row.className = "manage-option-row";
+
+    const name = document.createElement("span");
+    name.className = "manage-option-name";
+    name.textContent = opt.value;
+    row.appendChild(name);
+
+    const renameBtn = document.createElement("button");
+    renameBtn.type = "button";
+    renameBtn.className = "row-rename";
+    renameBtn.title = `Renomear "${opt.value}" (vale pra todo o sistema, inclusive lançamentos que já usam ela)`;
+    renameBtn.textContent = "✎";
+    renameBtn.addEventListener("click", async () => {
+      const newValue = prompt(`Novo texto para "${opt.value}":`, opt.value);
+      if (!newValue || !newValue.trim() || newValue.trim() === opt.value) return;
+      renameBtn.disabled = true;
+      try {
+        await renameOcorrenciaOption(field.key, opt.id, opt.value, newValue.trim());
+        renderManageOptionsList();
+        if (drawerCtx) drawerCtx.onReopen();
+      } catch (err) {
+        alert("Não foi possível renomear: " + describeError(err, "structure"));
+      } finally {
+        renameBtn.disabled = false;
+      }
+    });
+    row.appendChild(renameBtn);
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.type = "button";
+    deleteBtn.className = "row-delete";
+    deleteBtn.title = `Apagar "${opt.value}" da lista de opções`;
+    deleteBtn.textContent = "×";
+    deleteBtn.addEventListener("click", async () => {
+      if (
+        !confirm(
+          `Apagar a opção "${opt.value}" de "${field.label}"? Ela não aparece mais pra escolher ` +
+            `daqui pra frente — lançamentos que já usam ela continuam mostrando o texto normalmente.`
+        )
+      ) {
+        return;
+      }
+      deleteBtn.disabled = true;
+      try {
+        await deleteOcorrenciaOption(field.key, opt.id);
+        renderManageOptionsList();
+      } catch (err) {
+        alert("Não foi possível apagar: " + describeError(err, "structure"));
+        deleteBtn.disabled = false;
+      }
+    });
+    row.appendChild(deleteBtn);
+
+    manageOptionsListEl.appendChild(row);
+  }
+}
+
+document.getElementById("manageOptionsClose").addEventListener("click", closeManageOptionsPanel);
+manageOptionsBackdrop.addEventListener("click", closeManageOptionsPanel);
 
 async function handleCreateSubmit() {
   const kind = createKindEl.value;
