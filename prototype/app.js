@@ -1264,6 +1264,11 @@ function renderTreeTable() {
   // do mês em que ela de fato existe; nos outros meses visíveis mostra um
   // traço neutro, não clicável.
   function renderVariableEntryRow(entry, depth) {
+    // Só aparece quando o mês em que ela de fato existe está marcado no
+    // filtro de mês do topo — antes a linha sempre aparecia (com "—" nos
+    // meses que não eram o dela), então uma conta de Agosto continuava
+    // visível mesmo filtrando só Janeiro, o que confundia o usuário.
+    if (!months.some((m) => m.number === entry.month)) return;
     // Conta variável não passa pelo renderNode (não faz parte de
     // section/channel/property/centro/campo) — o filtro de status precisa
     // do próprio check aqui, olhando só o mês fixo da conta.

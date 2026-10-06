@@ -318,9 +318,11 @@ mês só. Por isso:
   digite o nome (livre — muda a cada lançamento, ex.: "Reembolso viagem João") e o mês. O painel
   de edição já abre na hora.
 - Na árvore, a conta variável aparece como mais uma linha dentro do centro de custo, com o selo
-  **Variável** e o mês entre parênteses no nome. Ela só mostra o selo de status real na coluna do
-  mês em que existe — nos outros meses visíveis, um traço neutro ("—") no lugar, já que ela
-  simplesmente não existiu ali.
+  **Variável** e o mês entre parênteses no nome — mas só quando esse mês está marcado no filtro de
+  mês do topo da aba Auditoria. Fora dele, a linha nem aparece (não faz sentido ver uma conta de
+  Agosto enquanto só Janeiro está selecionado, já que ela não existiu nesse mês). Com mais de um
+  mês marcado no filtro, a linha fica igual a um campo fixo: selo de status na coluna do mês em
+  que existe, e um traço neutro ("—") nas outras colunas visíveis.
 - **✎** renomeia, **×** apaga o lançamento inteiro (sem a ressalva de "só este mês" que existe
   pro campo fixo — aqui não tem outro mês pra preservar, então apagar é sempre definitivo, com
   confirmação).
