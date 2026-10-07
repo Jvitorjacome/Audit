@@ -177,7 +177,23 @@ function collectDashboardRows() {
   const properties = Array.from(
     new Set([...Object.values(propertyByCampoId), ...Object.values(propertyByCostCenterId)])
   ).sort();
-  return { rows, analyzedByMonth, properties };
+  // Mesmo split de vírgula/ponto-e-vírgula usado em "Ocorrências por tipo"
+  // mais abaixo (um erro pode ter mais de um tipo marcado) — a lista de
+  // opções do filtro precisa bater com os mesmos tipos "individuais" que
+  // aparecem nos gráficos/tabela, não a string crua de cada linha.
+  const typeSet = new Set();
+  for (const r of rows) {
+    const tipos = r.ocorrenciaTipo ? r.ocorrenciaTipo.split(/[,;]/).map((t) => t.trim()).filter(Boolean) : ["Não classificado"];
+    tipos.forEach((t) => typeSet.add(t));
+  }
+  const types = Array.from(typeSet).sort();
+  return { rows, analyzedByMonth, properties, types };
+}
+
+function rowMatchesTipo(row, tipoFilter) {
+  if (tipoFilter === DASH_ALL) return true;
+  const tipos = row.ocorrenciaTipo ? row.ocorrenciaTipo.split(/[,;]/).map((t) => t.trim()).filter(Boolean) : ["Não classificado"];
+  return tipos.includes(tipoFilter);
 }
 
 // dataset.analyzedByMonth[mk] é { total, byProp } — isola aqui a leitura do
@@ -189,11 +205,19 @@ function analyzedCountForMonth(dataset, monthKey, propFilter) {
   return propFilter === DASH_ALL ? bucket.total : bucket.byProp[propFilter] || 0;
 }
 
-function computeDashboardMetrics(dataset, mesFilter, propFilter) {
+function computeDashboardMetrics(dataset, mesFilter, propFilter, tipoFilter) {
   const rows = dataset.rows.filter(
-    (r) => (mesFilter === DASH_ALL || r.mes === mesFilter) && (propFilter === DASH_ALL || r.propriedade === propFilter)
+    (r) =>
+      (mesFilter === DASH_ALL || r.mes === mesFilter) &&
+      (propFilter === DASH_ALL || r.propriedade === propFilter) &&
+      rowMatchesTipo(r, tipoFilter)
   );
 
+  // "Total analisado" (e a taxa de conformidade/erro que depende dele) NÃO
+  // filtra por tipo — um campo "Conforme" nunca teve tipo de ocorrência
+  // nenhum, então não faz sentido um "total analisado só dos itens com tipo
+  // X". Filtrar só os ERROS (acima) já dá a pergunta certa: "que fração de
+  // tudo que foi auditado teve especificamente esse tipo de erro".
   const monthsInScope =
     mesFilter === DASH_ALL
       ? MONTHS.filter((m) => analyzedCountForMonth(dataset, m.key, propFilter) > 0).map((m) => m.key)
@@ -407,7 +431,7 @@ function dashRankingChart(container, key, items, opts) {
 // pra claro antes (senão os gráficos saem com eixo/grade claros demais pra
 // enxergar num fundo branco de impressão) e volta pro tema original depois
 // que a caixa de diálogo de impressão fecha.
-function dashPrintReport(mesLabel, propLabel) {
+function dashPrintReport(mesLabel, propLabel, tipoLabel) {
   const html = document.documentElement;
   const originalTheme = html.getAttribute("data-theme") === "light" ? "light" : "dark";
   const switchToLight = originalTheme !== "light";
@@ -419,7 +443,7 @@ function dashPrintReport(mesLabel, propLabel) {
     const h1 = document.createElement("h1");
     h1.textContent = "Relatório de Indicadores — Sistema de Auditoria QAVI";
     const pFiltro = document.createElement("p");
-    pFiltro.textContent = `Filtro aplicado: Mês — ${mesLabel} · Propriedade — ${propLabel}`;
+    pFiltro.textContent = `Filtro aplicado: Mês — ${mesLabel} · Propriedade — ${propLabel} · Tipo de ocorrência — ${tipoLabel}`;
     const pData = document.createElement("p");
     pData.textContent = `Gerado em ${new Date().toLocaleString("pt-BR")}`;
     header.appendChild(h1);
@@ -470,7 +494,7 @@ function dashPrintReport(mesLabel, propLabel) {
 
 // ---------- render principal ----------
 
-let dashFilterState = { mes: DASH_ALL, prop: DASH_ALL };
+let dashFilterState = { mes: DASH_ALL, prop: DASH_ALL, tipo: DASH_ALL };
 
 function renderDashboard() {
   dashRefreshColors();
@@ -535,12 +559,37 @@ function renderDashboardFilters(dataset) {
   propField.appendChild(propLabel);
   propField.appendChild(propSelect);
 
+  const tipoField = document.createElement("label");
+  tipoField.className = "field";
+  const tipoLabel = document.createElement("span");
+  tipoLabel.className = "field-label";
+  tipoLabel.textContent = "Tipo de ocorrência";
+  const tipoSelect = document.createElement("select");
+  tipoSelect.className = "select";
+  const tipoAllOpt = document.createElement("option");
+  tipoAllOpt.value = DASH_ALL;
+  tipoAllOpt.textContent = "Todos os tipos";
+  tipoSelect.appendChild(tipoAllOpt);
+  for (const t of dataset.types) {
+    const o = document.createElement("option");
+    o.value = t;
+    o.textContent = t;
+    tipoSelect.appendChild(o);
+  }
+  tipoSelect.value = dashFilterState.tipo;
+  tipoSelect.addEventListener("change", () => {
+    dashFilterState.tipo = tipoSelect.value;
+    renderDashboardBody(dataset);
+  });
+  tipoField.appendChild(tipoLabel);
+  tipoField.appendChild(tipoSelect);
+
   const clearBtn = document.createElement("button");
   clearBtn.type = "button";
   clearBtn.className = "btn";
   clearBtn.textContent = "Limpar filtros";
   clearBtn.addEventListener("click", () => {
-    dashFilterState = { mes: DASH_ALL, prop: DASH_ALL };
+    dashFilterState = { mes: DASH_ALL, prop: DASH_ALL, tipo: DASH_ALL };
     renderDashboard();
   });
 
@@ -551,11 +600,16 @@ function renderDashboardFilters(dataset) {
   printBtn.addEventListener("click", () => {
     // Lê o texto já selecionado nos <select> (não dashFilterState) pra
     // pegar o rótulo legível ("Março de 2026"), não o value interno.
-    dashPrintReport(mesSelect.options[mesSelect.selectedIndex].text, propSelect.options[propSelect.selectedIndex].text);
+    dashPrintReport(
+      mesSelect.options[mesSelect.selectedIndex].text,
+      propSelect.options[propSelect.selectedIndex].text,
+      tipoSelect.options[tipoSelect.selectedIndex].text
+    );
   });
 
   el.appendChild(mesField);
   el.appendChild(propField);
+  el.appendChild(tipoField);
   el.appendChild(clearBtn);
   el.appendChild(printBtn);
 }
@@ -572,7 +626,7 @@ function renderDashboardBody(dataset) {
     return;
   }
 
-  const m = computeDashboardMetrics(dataset, dashFilterState.mes, dashFilterState.prop);
+  const m = computeDashboardMetrics(dataset, dashFilterState.mes, dashFilterState.prop, dashFilterState.tipo);
 
   // KPIs. Impacto QAVI x proprietário fica pra uma próxima rodada (a pedido) —
   // por ora só os totais: analisado, não conformidades (com % de erro),

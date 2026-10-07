@@ -347,10 +347,20 @@ mês só. Por isso:
 O sistema agora tem duas abas: **Auditoria** (a árvore de sempre) e **Indicadores** — um
 dashboard com KPIs e gráficos, inspirado no projeto "Audit Insights Hub" (Lovable) que o
 administrador já usava, mas lendo os dados direto deste banco (não da planilha do Google Sheets).
-Filtra por mês e propriedade — **os dois filtros afetam todos os indicadores**, inclusive
-"Total analisado" e os cards de conformidade por mês (não só os gráficos de erro): filtrar por
-uma propriedade mostra só o que foi analisado *daquela* propriedade, não o total do sistema
-inteiro. Conta campos fixos e contas variáveis juntos. Mostra:
+Filtra por mês, propriedade e **tipo de ocorrência** — os três filtros ficam conectados entre si
+(dá pra combinar, ex.: "Valor" + "Ma Plage" + "Fevereiro" mostra só os erros desse tipo, nessa
+propriedade, nesse mês). Mês e propriedade afetam **todos os indicadores**, inclusive "Total
+analisado" e os cards de conformidade por mês (não só os gráficos de erro): filtrar por uma
+propriedade mostra só o que foi analisado *daquela* propriedade, não o total do sistema inteiro.
+Tipo de ocorrência é diferente por natureza — um campo "Conforme" nunca teve tipo de ocorrência
+nenhum, então ele filtra só as **não conformidades** (e tudo que vem delas: valores
+impactados/corrigidos, erros por setor/funcionário/propriedade, a própria tabela de tipos), nunca
+o "Total analisado"; assim a taxa de erro mostrada passa a significar "que fração de tudo que foi
+auditado teve especificamente esse tipo de erro". A lista de tipos no filtro já vem "desmembrada"
+— um erro com mais de um tipo marcado (separados por vírgula) conta em cada tipo individualmente,
+igual ao gráfico/tabela "Ocorrências por tipo". **"Limpar filtros"** reseta os três de uma vez, e
+**"Gerar relatório PDF"** registra os três no cabeçalho do relatório. Conta campos fixos e contas
+variáveis juntos. Mostra:
 
 - **Total analisado** — quantos campos tiveram pelo menos um dos 5 indicadores marcado no mês
   (não conta célula tocada só por causa de valor/observações/ocorrência, nem mês oculto — ver
