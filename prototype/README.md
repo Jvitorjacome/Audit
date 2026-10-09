@@ -74,6 +74,26 @@ do que ajudaria ali.
   uma métrica só, sem legenda" como anti-padrão (gasta o canal de identidade sem dizer o que cada
   cor significa).
 
+### Logo QAVI (selo "Q")
+
+Um selo "Q" em SVG inline — degradê fixo navy → `--brand` → `--accent` (os mesmos hex nos dois
+temas, como o resto da paleta de marca) com um brilho sutil por cima (pra sugerir profundidade,
+sem ser um render 3D de verdade) e um badge de check no canto, reforçando "auditoria". Aparece em
+3 tamanhos (`.qavi-logo-lg`/`.qavi-logo-sm`/`.qavi-logo-header`) em 3 lugares: grande no painel de
+marca da tela de login, pequeno no topo do card de entrar, e no cabeçalho do app ao lado do título
+— mais a mesma arte como favicon (ícone da aba do navegador). Cada instância carrega seu próprio
+`<defs>` (gradiente) em vez de dividir um só: `url(#id)` de um elemento dentro de uma `<svg>` que
+estiver num ancestral `display:none` (ex.: a tela de login escondida depois do login) não resolve
+pra quem estiver fora dela — então o selo do cabeçalho, que só aparece depois que `#authScreen`
+já está oculto, precisa da própria cópia do degradê pra não ficar "apagado".
+
+A tela de login ganhou um painel de marca (lado esquerdo, fundo escuro fixo — não muda com o
+tema, é superfície de marketing, não de conteúdo) com o selo grande, "QAVI" + "quarto à vista",
+um título e 3 linhas curtas descrevendo o sistema de verdade (sem número inventado — só recursos
+reais: filtros conectados, histórico que nunca se apaga, trilha por mês/propriedade/status/tipo).
+Em telas estreitas (≤820px) esse painel empilha acima do formulário de entrar, e a lista de
+recursos some pra caber sem rolar demais.
+
 ## Arquivos
 
 - **`index.html` / `styles.css`** — layout, tela de login, as duas abas (Auditoria/Indicadores)

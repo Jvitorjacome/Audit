@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sistema de Auditoria - QAVI</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='6%25' y1='94%25' x2='94%25' y2='6%25'%3E%3Cstop offset='0%25' stop-color='%230a192f'/%3E%3Cstop offset='52%25' stop-color='%2300798f'/%3E%3Cstop offset='100%25' stop-color='%2300e5ff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='3' y='3' width='90' height='90' rx='22' fill='url(%23g)'/%3E%3Ctext x='38' y='66' font-family='Arial, sans-serif' font-size='48' font-weight='700' fill='%23ffffff'%3EQ%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="styles.css">
 <script>
@@ -29,21 +30,83 @@
 </button>
 
 <div class="auth-screen" id="authScreen">
-  <div class="auth-card">
-    <h1>Sistema de Auditoria - QAVI</h1>
-    <p>Entre com sua conta para acessar os dados de auditoria.</p>
-    <form id="loginForm">
-      <label class="field">
-        <span class="field-label">E-mail</span>
-        <input class="text-input" id="loginEmail" type="email" required autocomplete="username">
-      </label>
-      <label class="field">
-        <span class="field-label">Senha</span>
-        <input class="text-input" id="loginPassword" type="password" required autocomplete="current-password">
-      </label>
-      <p class="auth-error" id="authError" hidden></p>
-      <button class="btn btn-primary" type="submit" id="loginSubmit">Entrar</button>
-    </form>
+  <div class="auth-shell">
+    <aside class="auth-hero">
+      <div class="auth-hero-brand">
+        <span class="qavi-logo qavi-logo-lg" aria-hidden="true">
+          <svg viewBox="0 0 96 96" width="100%" height="100%">
+            <defs>
+              <linearGradient id="qaviLogoGrad" x1="6%" y1="94%" x2="94%" y2="6%">
+                <stop offset="0%" stop-color="#0a192f"/>
+                <stop offset="52%" stop-color="#00798f"/>
+                <stop offset="100%" stop-color="#00e5ff"/>
+              </linearGradient>
+              <radialGradient id="qaviLogoGloss" cx="30%" cy="18%" r="65%">
+                <stop offset="0%" stop-color="#ffffff" stop-opacity="0.4"/>
+                <stop offset="55%" stop-color="#ffffff" stop-opacity="0.08"/>
+                <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+              </radialGradient>
+            </defs>
+            <rect x="3" y="3" width="90" height="90" rx="22" fill="url(#qaviLogoGrad)"/>
+            <rect x="3" y="3" width="90" height="90" rx="22" fill="url(#qaviLogoGloss)"/>
+            <rect x="3.5" y="3.5" width="89" height="89" rx="21.5" fill="none" stroke="#ffffff" stroke-opacity="0.14"/>
+            <text x="38" y="66" font-family="Inter, system-ui, sans-serif" font-size="48" font-weight="700" fill="#ffffff">Q</text>
+            <circle cx="72" cy="72" r="17" fill="#0a192f"/>
+            <circle cx="72" cy="72" r="17" fill="none" stroke="#00e5ff" stroke-width="2"/>
+            <path d="M64.5 72.5l4.8 4.8 10-10.2" fill="none" stroke="#00e5ff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+        <span class="qavi-wordmark">QAVI<span class="qavi-wordmark-sub">quarto à vista</span></span>
+      </div>
+      <h1 class="auth-hero-title">Auditoria financeira,<br>numa tela só.</h1>
+      <p class="auth-hero-sub">
+        Trilha de auditoria por propriedade, status por campo e um histórico que nunca se perde —
+        tudo conectado ao banco de dados em tempo real.
+      </p>
+      <ul class="auth-hero-points">
+        <li><span class="auth-hero-point-icon">✓</span>Indicadores e filtros conectados, em tempo real</li>
+        <li><span class="auth-hero-point-icon">✓</span>Histórico completo — nada é apagado</li>
+        <li><span class="auth-hero-point-icon">✓</span>Trilha por mês, propriedade, status e tipo de ocorrência</li>
+      </ul>
+    </aside>
+    <div class="auth-card">
+      <span class="qavi-logo qavi-logo-sm" aria-hidden="true">
+        <svg viewBox="0 0 96 96" width="100%" height="100%">
+          <defs>
+            <linearGradient id="qaviLogoGradSm" x1="6%" y1="94%" x2="94%" y2="6%">
+              <stop offset="0%" stop-color="#0a192f"/>
+              <stop offset="52%" stop-color="#00798f"/>
+              <stop offset="100%" stop-color="#00e5ff"/>
+            </linearGradient>
+            <radialGradient id="qaviLogoGlossSm" cx="30%" cy="18%" r="65%">
+              <stop offset="0%" stop-color="#ffffff" stop-opacity="0.4"/>
+              <stop offset="55%" stop-color="#ffffff" stop-opacity="0.08"/>
+              <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+          <rect x="3" y="3" width="90" height="90" rx="22" fill="url(#qaviLogoGradSm)"/>
+          <rect x="3" y="3" width="90" height="90" rx="22" fill="url(#qaviLogoGlossSm)"/>
+          <text x="38" y="66" font-family="Inter, system-ui, sans-serif" font-size="48" font-weight="700" fill="#ffffff">Q</text>
+          <circle cx="72" cy="72" r="17" fill="#0a192f"/>
+          <circle cx="72" cy="72" r="17" fill="none" stroke="#00e5ff" stroke-width="2"/>
+          <path d="M64.5 72.5l4.8 4.8 10-10.2" fill="none" stroke="#00e5ff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+      <h2 class="auth-card-title">Entrar no Sistema de Auditoria</h2>
+      <p>Entre com sua conta para acessar os dados de auditoria.</p>
+      <form id="loginForm">
+        <label class="field">
+          <span class="field-label">E-mail</span>
+          <input class="text-input" id="loginEmail" type="email" required autocomplete="username">
+        </label>
+        <label class="field">
+          <span class="field-label">Senha</span>
+          <input class="text-input" id="loginPassword" type="password" required autocomplete="current-password">
+        </label>
+        <p class="auth-error" id="authError" hidden></p>
+        <button class="btn btn-primary" type="submit" id="loginSubmit">Entrar</button>
+      </form>
+    </div>
   </div>
 </div>
 
@@ -52,8 +115,24 @@
     <div class="page-header-inner">
       <div class="page-header-top">
         <div class="page-header-title">
-          <span class="page-header-icon" aria-hidden="true">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6c0 5 3.4 8.7 8 10 4.6-1.3 8-5 8-10V5z"/><path d="m9 12 2 2 4-4"/></svg>
+          <span class="qavi-logo qavi-logo-header" aria-hidden="true">
+            <svg viewBox="0 0 96 96" width="100%" height="100%">
+              <defs>
+                <linearGradient id="qaviLogoGradHeader" x1="6%" y1="94%" x2="94%" y2="6%">
+                  <stop offset="0%" stop-color="#0a192f"/>
+                  <stop offset="52%" stop-color="#00798f"/>
+                  <stop offset="100%" stop-color="#00e5ff"/>
+                </linearGradient>
+                <radialGradient id="qaviLogoGlossHeader" cx="30%" cy="18%" r="65%">
+                  <stop offset="0%" stop-color="#ffffff" stop-opacity="0.4"/>
+                  <stop offset="55%" stop-color="#ffffff" stop-opacity="0.08"/>
+                  <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+                </radialGradient>
+              </defs>
+              <rect x="3" y="3" width="90" height="90" rx="22" fill="url(#qaviLogoGradHeader)"/>
+              <rect x="3" y="3" width="90" height="90" rx="22" fill="url(#qaviLogoGlossHeader)"/>
+              <text x="38" y="66" font-family="Inter, system-ui, sans-serif" font-size="48" font-weight="700" fill="#ffffff">Q</text>
+            </svg>
           </span>
           <div>
             <h1>Sistema de Auditoria - QAVI</h1>
